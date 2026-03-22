@@ -1,0 +1,29 @@
+# flywheel-planner environment configuration
+# Copy to .envrc and fill in your values, then run: direnv allow
+#
+# Alternatively, export these variables in your shell profile.
+
+# ── Provider API Keys (required for real model execution) ──────────────
+# At minimum, one of each family is needed for the dual-model workflow.
+# Keys are loaded from env vars first, then ~/.flywheel-planner/credentials.json.
+export FLYWHEEL_OPENAI_API_KEY=""
+export FLYWHEEL_ANTHROPIC_API_KEY=""
+
+# ── Application Settings (all optional — defaults shown) ──────────────
+
+# Local data directory for database, artifacts, and raw payloads.
+# export FLYWHEEL_DATA_DIR="$HOME/.flywheel-planner"
+
+# HTTP server listen address. Loopback only — do not expose to network.
+# export FLYWHEEL_LISTEN_ADDR="127.0.0.1:7432"
+
+# Structured log level: debug, info, warn, error.
+# export FLYWHEEL_LOG_LEVEL="info"
+
+# ── Testing / Development ─────────────────────────────────────────────
+
+# Use mock providers instead of real API calls (no keys required).
+# export FLYWHEEL_MOCK_PROVIDERS="true"
+
+# Mock provider scenario selection.
+# export FLYWHEEL_MOCK_SCENARIO="happy-path-prd"
