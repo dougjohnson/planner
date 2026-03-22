@@ -47,6 +47,7 @@ type ChipStatus =
 function mapStatus(status: string): ChipStatus {
   const mapping: Record<string, ChipStatus> = {
     not_started: "pending",
+    ready: "pending",
     running: "running",
     completed: "completed",
     failed: "failed",
@@ -54,8 +55,77 @@ function mapStatus(status: string): ChipStatus {
     cancelled: "cancelled",
     interrupted: "interrupted",
     paused: "blocked",
+    awaiting_user: "blocked",
+    retryable_failure: "failed",
   };
   return mapping[status] ?? "pending";
+}
+
+interface StageActionProps {
+  stageId: string;
+  status: string;
+  projectId: string;
+}
+
+function StageAction({ stageId, status, projectId }: StageActionProps) {
+  const isReady = status === "ready";
+  const isAwaitingUser = status === "awaiting_user";
+  const isFailed = status === "failed" || status === "retryable_failure";
+
+  if (stageId === "foundations" && isReady) {
+    return (
+      <Link to={`/projects/${projectId}/foundations`}>
+        <Button size="sm">Set Up Foundations</Button>
+      </Link>
+    );
+  }
+
+  if (stageId === "prd_intake" && isReady) {
+    return (
+      <Link to={`/projects/${projectId}/prd-intake`}>
+        <Button size="sm">Enter Seed PRD</Button>
+      </Link>
+    );
+  }
+
+  if ((stageId === "prd_disagreement_review" || stageId === "plan_disagreement_review") && isAwaitingUser) {
+    return (
+      <Link to={`/projects/${projectId}/review/${stageId}`}>
+        <Button size="sm">Review Disagreements</Button>
+      </Link>
+    );
+  }
+
+  if (stageId === "final_export" && isReady) {
+    return (
+      <Link to={`/projects/${projectId}/export`}>
+        <Button size="sm">Review & Export</Button>
+      </Link>
+    );
+  }
+
+  if (isFailed) {
+    return (
+      <Button size="sm" variant="secondary" onClick={() => {
+        fetch(`/api/projects/${projectId}/workflow/stages/${stageId}/retry`, { method: "POST" });
+      }}>
+        Retry
+      </Button>
+    );
+  }
+
+  if (isReady) {
+    return (
+      <Button size="sm" onClick={() => {
+        fetch(`/api/projects/${projectId}/workflow/stages/${stageId}/start`, { method: "POST" });
+        window.location.reload();
+      }}>
+        Start Stage
+      </Button>
+    );
+  }
+
+  return null;
 }
 
 export default function ProjectDashboard() {
@@ -116,6 +186,7 @@ export default function ProjectDashboard() {
                       </Link>
                     )}
                   </div>
+                  <StageAction stageId={stage.key} status={stage.status} projectId={projectId!} />
                 </div>
               ))}
             </div>
