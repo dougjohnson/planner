@@ -69,7 +69,7 @@ func TestStage15_PlanCommit_UpdateFragment(t *testing.T) {
 	// Lineage recorded.
 	var relCount int
 	tdb.DB.QueryRowContext(ctx,
-		`SELECT COUNT(*) FROM artifact_relations WHERE artifact_id = ? AND relation_type = 'derived_from'`,
+		`SELECT COUNT(*) FROM artifact_relations WHERE artifact_id = ? AND relation_type = 'revised_from'`,
 		result.ArtifactID).Scan(&relCount)
 	assert.Equal(t, 1, relCount)
 }

@@ -11,13 +11,13 @@ import (
 
 // stagesRequiringUserAction cannot auto-advance — they need user input.
 var stagesRequiringUserAction = map[string]bool{
-	"foundations":            true, // Stage 1: user uploads foundations
-	"prd_disagreement_review": true, // Stage 6: user reviews disagreements
-	"prd_loop_control":       true, // Stage 9: decision to continue loop
-	"parallel_plan_generation": false, // Stage 10: auto from 9
+	"foundations":              true, // Stage 1: user uploads foundations
+	"prd_intake":               true, // Stage 2: user uploads seed PRD
+	"prd_disagreement_review":  true, // Stage 6: user reviews disagreements
+	"prd_loop_control":         true, // Stage 9: decision to continue loop
 	"plan_disagreement_review": true, // Stage 13: user reviews plan disagreements
-	"plan_loop_control":       true, // Stage 16: decision to continue loop
-	"final_review":            true, // Stage 17: user final review
+	"plan_loop_control":        true, // Stage 16: decision to continue loop
+	"final_export":             true, // Stage 17: user final review and export
 }
 
 // AdvanceDecision represents the result of evaluating auto-advance.
@@ -66,9 +66,36 @@ func (a *AutoAdvancer) Evaluate(completedStageID string) (*AdvanceDecision, erro
 		}, nil
 	}
 
-	// Check if the first candidate stage requires user action.
-	// If multiple candidates exist, we take the first one (guard evaluation
-	// will be done by the caller with actual state).
+	// When multiple transitions exist (e.g., prd_integration → prd_disagreement_review
+	// OR prd_review), the auto-advancer cannot choose between them without evaluating
+	// guard conditions against actual DB state. In that case, do NOT auto-advance —
+	// return the candidates so the caller (with DB access) can evaluate guards.
+	if len(candidates) > 1 {
+		// Multiple outgoing paths require guard evaluation with real state.
+		// Check if ANY candidate targets a user-action stage.
+		for _, c := range candidates {
+			if stagesRequiringUserAction[c.ToStageID] {
+				return &AdvanceDecision{
+					ShouldAdvance: false,
+					FromStageID:   completedStageID,
+					ToStageID:     c.ToStageID,
+					Guard:         c.Guard,
+					Reason:        fmt.Sprintf("multiple transitions available; %s requires user action", c.ToStageID),
+					AwaitingUser:  true,
+				}, nil
+			}
+		}
+		// Multiple non-user targets — guard evaluation needed by caller.
+		return &AdvanceDecision{
+			ShouldAdvance: false,
+			FromStageID:   completedStageID,
+			ToStageID:     candidates[0].ToStageID,
+			Guard:         candidates[0].Guard,
+			Reason:        fmt.Sprintf("multiple transitions from %s require guard evaluation", completedStageID),
+		}, nil
+	}
+
+	// Single outgoing transition — check if it needs user action.
 	candidate := candidates[0]
 
 	if stagesRequiringUserAction[candidate.ToStageID] {
@@ -87,7 +114,7 @@ func (a *AutoAdvancer) Evaluate(completedStageID string) (*AdvanceDecision, erro
 		FromStageID:   completedStageID,
 		ToStageID:     candidate.ToStageID,
 		Guard:         candidate.Guard,
-		Reason:        "auto-advance: guard conditions met",
+		Reason:        "auto-advance: single outgoing transition",
 	}, nil
 }
 

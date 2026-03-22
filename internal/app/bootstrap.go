@@ -14,7 +14,9 @@ import (
 	"github.com/dougflynn/flywheel-planner/internal/documents/composer"
 	"github.com/dougflynn/flywheel-planner/internal/documents/fragments"
 	"github.com/dougflynn/flywheel-planner/internal/events"
+	"github.com/dougflynn/flywheel-planner/internal/prompts/canonical"
 	"github.com/dougflynn/flywheel-planner/internal/prompts/rendering"
+	"github.com/dougflynn/flywheel-planner/internal/workflow"
 )
 
 // Services holds all initialized application services.
@@ -54,8 +56,20 @@ func Bootstrap(ctx context.Context, cfg *Config, db *sql.DB, logger *slog.Logger
 	eventPublisher := events.NewPublisher(db, sseHub, logger)
 
 	// Step 9: Seed canonical prompts (idempotent).
-	// Note: canonical seeding is handled by the prompts/canonical package
-	// which is wired separately. The seed function is idempotent.
+	logger.Info("seeding canonical prompts")
+	if err := canonical.Seed(ctx, db, logger); err != nil {
+		return nil, fmt.Errorf("seeding canonical prompts: %w", err)
+	}
+
+	// Step 10: Crash recovery — mark any runs left in "running" from a prior
+	// crash as "interrupted" BEFORE new workflow actions are accepted (§6.5).
+	interrupted, err := workflow.RecoverInterruptedRuns(ctx, db, logger)
+	if err != nil {
+		return nil, fmt.Errorf("crash recovery: %w", err)
+	}
+	if interrupted > 0 {
+		logger.Warn("recovered interrupted runs from prior crash", "count", interrupted)
+	}
 
 	// Step 14: Build API handlers.
 	projectHandler := handlers.NewProjectHandler(projectRepo, logger)

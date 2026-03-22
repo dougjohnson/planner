@@ -20,8 +20,8 @@ func TestExhaustiveAutoAdvance_EveryStage(t *testing.T) {
 		awaitingUser  bool
 		hasTransition bool
 	}{
-		// Stage 1: foundations → prd_intake (auto if guard passes)
-		{"foundations", true, false, true},
+		// Stage 1: foundations → prd_intake (prd_intake requires user action)
+		{"foundations", false, true, true},
 		// Stage 2: prd_intake → parallel_prd_generation (auto)
 		{"prd_intake", true, false, true},
 		// Stage 3: parallel_prd_generation → prd_synthesis (auto)
@@ -36,8 +36,8 @@ func TestExhaustiveAutoAdvance_EveryStage(t *testing.T) {
 		{"prd_review", true, false, true},
 		// Stage 8: prd_commit → prd_loop_control (user decides loop)
 		{"prd_commit", false, true, true},
-		// Stage 9: prd_loop_control → prd_review or parallel_plan_generation (user decision)
-		{"prd_loop_control", true, false, true},
+		// Stage 9: prd_loop_control → multiple targets (needs guard evaluation)
+		{"prd_loop_control", false, false, true},
 		// Stage 10: parallel_plan_generation → plan_synthesis (auto)
 		{"parallel_plan_generation", true, false, true},
 		// Stage 11: plan_synthesis → plan_integration (auto)
@@ -50,8 +50,8 @@ func TestExhaustiveAutoAdvance_EveryStage(t *testing.T) {
 		{"plan_review", true, false, true},
 		// Stage 15: plan_commit → plan_loop_control (user decides loop)
 		{"plan_commit", false, true, true},
-		// Stage 16: plan_loop_control → plan_review or final_export (user decision)
-		{"plan_loop_control", true, false, true},
+		// Stage 16: plan_loop_control → multiple targets (needs guard evaluation)
+		{"plan_loop_control", false, false, true},
 		// Stage 17: final_export — terminal, no transitions
 		{"final_export", false, false, false},
 	}
