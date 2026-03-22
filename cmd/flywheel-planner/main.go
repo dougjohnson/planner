@@ -65,6 +65,7 @@ func run(ctx context.Context, cfg *app.Config, logger *slog.Logger) error {
 	srv.MountProjectRoutes(services.ProjectHandler)
 	srv.MountWorkflowRoutes(services.WorkflowHandler)
 	srv.MountFoundationsRoutes(services.FoundationsHandler)
+	srv.MountPRDIntake(handlers.NewPRDIntakeHandler(services.DB, logger))
 	srv.MountSSE(services.SSEHub)
 	srv.MountModelRoutes(handlers.NewModelHandler(services.DB, logger))
 	srv.MountPromptRoutes(handlers.NewPromptHandler(services.DB, logger))

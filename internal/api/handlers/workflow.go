@@ -1,20 +1,25 @@
 package handlers
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/dougflynn/flywheel-planner/internal/api/response"
 	"github.com/dougflynn/flywheel-planner/internal/events"
 	"github.com/dougflynn/flywheel-planner/internal/workflow"
+	"github.com/dougflynn/flywheel-planner/internal/workflow/engine"
 	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
 )
 
 // WorkflowHandler handles workflow API requests.
 type WorkflowHandler struct {
 	db             *sql.DB
+	dispatcher     *engine.Dispatcher
 	eventPublisher *events.Publisher
 	logger         *slog.Logger
 }
@@ -22,6 +27,12 @@ type WorkflowHandler struct {
 // NewWorkflowHandler creates a new WorkflowHandler.
 func NewWorkflowHandler(db *sql.DB, pub *events.Publisher, logger *slog.Logger) *WorkflowHandler {
 	return &WorkflowHandler{db: db, eventPublisher: pub, logger: logger}
+}
+
+// SetDispatcher sets the stage handler dispatcher.
+// Called after bootstrap when all stage handlers are registered.
+func (h *WorkflowHandler) SetDispatcher(d *engine.Dispatcher) {
+	h.dispatcher = d
 }
 
 // Routes registers workflow routes on the given router.
@@ -195,17 +206,68 @@ func (h *WorkflowHandler) StartStage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Create a workflow_run record.
+	runID := uuid.NewString()
+	now := time.Now().UTC().Format(time.RFC3339)
+	_, err := h.db.ExecContext(r.Context(),
+		`INSERT INTO workflow_runs (id, project_id, stage, status, attempt, created_at)
+		 VALUES (?, ?, ?, 'running', 1, ?)`,
+		runID, projectID, stage, now)
+	if err != nil {
+		h.logger.Error("creating workflow run", "error", err)
+		response.InternalError(w, "failed to create workflow run")
+		return
+	}
+
+	// Update project's current_stage.
+	h.db.ExecContext(r.Context(),
+		`UPDATE projects SET current_stage = ?, updated_at = ? WHERE id = ?`,
+		stage, now, projectID)
+
+	// Publish SSE event.
 	if h.eventPublisher != nil {
-		h.eventPublisher.Publish(r.Context(), projectID, events.StageStarted, "", events.Payload{
+		h.eventPublisher.Publish(r.Context(), projectID, events.StageStarted, runID, events.Payload{
 			Stage:   stage,
+			RunID:   runID,
 			Message: "Stage started",
 		})
 	}
 
-	h.logger.Info("stage started", "project_id", projectID, "stage", stage)
+	// Dispatch to stage handler asynchronously (don't block HTTP response).
+	if h.dispatcher != nil && h.dispatcher.HasHandler(stage) {
+		go func() {
+			ctx := context.Background()
+			if err := h.dispatcher.Dispatch(ctx, stage, projectID, runID); err != nil {
+				h.logger.Error("stage execution failed",
+					"stage", stage, "project_id", projectID, "run_id", runID, "error", err)
+				// Mark run as failed.
+				h.db.ExecContext(ctx,
+					`UPDATE workflow_runs SET status = 'failed', error_message = ?, completed_at = ? WHERE id = ?`,
+					err.Error(), time.Now().UTC().Format(time.RFC3339), runID)
+				if h.eventPublisher != nil {
+					h.eventPublisher.Publish(ctx, projectID, events.StageFailed, runID, events.Payload{
+						Stage: stage, RunID: runID, Error: err.Error(),
+					})
+				}
+			} else {
+				// Mark run as completed.
+				h.db.ExecContext(ctx,
+					`UPDATE workflow_runs SET status = 'completed', completed_at = ? WHERE id = ?`,
+					time.Now().UTC().Format(time.RFC3339), runID)
+				if h.eventPublisher != nil {
+					h.eventPublisher.Publish(ctx, projectID, events.StageCompleted, runID, events.Payload{
+						Stage: stage, RunID: runID,
+					})
+				}
+			}
+		}()
+	}
+
+	h.logger.Info("stage started", "project_id", projectID, "stage", stage, "run_id", runID)
 	response.JSON(w, http.StatusOK, map[string]string{
 		"project_id": projectID,
 		"stage":      stage,
+		"run_id":     runID,
 		"action":     "started",
 	})
 }

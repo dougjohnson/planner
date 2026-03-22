@@ -141,6 +141,11 @@ func (s *Server) MountFoundationsRoutes(h *handlers.FoundationsHandler) {
 	s.router.Route("/api/projects/{projectId}/foundations", h.Routes)
 }
 
+// MountPRDIntake registers the seed PRD submission endpoint.
+func (s *Server) MountPRDIntake(h *handlers.PRDIntakeHandler) {
+	s.router.Post("/api/projects/{projectId}/prd-seed", h.HandleSubmit)
+}
+
 // MountSSE registers the SSE endpoint for real-time events.
 func (s *Server) MountSSE(hub *sse.Hub) {
 	s.router.Get("/api/projects/{projectId}/events", func(w http.ResponseWriter, r *http.Request) {
