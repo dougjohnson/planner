@@ -147,18 +147,11 @@ func (r *ReviewRepository) ListByProject(ctx context.Context, projectID string, 
 }
 
 // RecordDecision records a user's accept/reject decision and updates the review item status.
+// The status check and update are performed atomically inside a transaction to prevent
+// TOCTOU races where two concurrent calls could both see "pending" and both succeed.
 func (r *ReviewRepository) RecordDecision(ctx context.Context, reviewItemID, action, userNote string) (*ReviewDecision, error) {
 	if action != "accepted" && action != "rejected" {
 		return nil, fmt.Errorf("invalid action %q: must be 'accepted' or 'rejected'", action)
-	}
-
-	// Check item exists and is pending.
-	item, err := r.GetReviewItem(ctx, reviewItemID)
-	if err != nil {
-		return nil, err
-	}
-	if item.Status != StatusPending {
-		return nil, fmt.Errorf("%w: current status is %s", ErrAlreadyDecided, item.Status)
 	}
 
 	decision := &ReviewDecision{
@@ -175,6 +168,32 @@ func (r *ReviewRepository) RecordDecision(ctx context.Context, reviewItemID, act
 	}
 	defer tx.Rollback()
 
+	// Atomically check status and update in one statement. If the item is not
+	// pending, zero rows are affected and we detect the conflict.
+	result, err := tx.ExecContext(ctx,
+		`UPDATE review_items SET status = ? WHERE id = ? AND status = 'pending'`,
+		action, reviewItemID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("updating review item status: %w", err)
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return nil, fmt.Errorf("checking rows affected: %w", err)
+	}
+	if affected == 0 {
+		// Either the item doesn't exist or it's not pending.
+		// Query within the transaction to avoid deadlock with MaxOpenConns(1).
+		var currentStatus string
+		err := tx.QueryRowContext(ctx,
+			"SELECT status FROM review_items WHERE id = ?", reviewItemID,
+		).Scan(&currentStatus)
+		if err != nil {
+			return nil, fmt.Errorf("%w: %s", ErrReviewItemNotFound, reviewItemID)
+		}
+		return nil, fmt.Errorf("%w: current status is %s", ErrAlreadyDecided, currentStatus)
+	}
+
 	_, err = tx.ExecContext(ctx,
 		`INSERT INTO review_decisions (id, review_item_id, action, user_note, created_at)
 		 VALUES (?, ?, ?, ?, ?)`,
@@ -182,14 +201,6 @@ func (r *ReviewRepository) RecordDecision(ctx context.Context, reviewItemID, act
 	)
 	if err != nil {
 		return nil, fmt.Errorf("inserting decision: %w", err)
-	}
-
-	_, err = tx.ExecContext(ctx,
-		`UPDATE review_items SET status = ? WHERE id = ?`,
-		action, reviewItemID,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("updating review item status: %w", err)
 	}
 
 	if err := tx.Commit(); err != nil {

@@ -46,9 +46,15 @@ type BundleManifest struct {
 
 // Bundle assembles a zip archive from the given files and writes it to w.
 // Returns a manifest describing the bundle contents.
-func Bundle(w io.Writer, projectID, projectName string, files []BundleFile, opts BundleOptions) (*BundleManifest, error) {
+func Bundle(w io.Writer, projectID, projectName string, files []BundleFile, opts BundleOptions) (_ *BundleManifest, err error) {
 	zw := zip.NewWriter(w)
-	defer zw.Close()
+	// Close explicitly rather than deferring — zip.Writer.Close writes the
+	// central directory, and we must surface that error to the caller.
+	defer func() {
+		if closeErr := zw.Close(); closeErr != nil && err == nil {
+			err = fmt.Errorf("finalizing zip: %w", closeErr)
+		}
+	}()
 
 	manifest := &BundleManifest{
 		ProjectID:   projectID,

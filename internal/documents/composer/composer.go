@@ -71,22 +71,13 @@ func (c *Composer) Compose(ctx context.Context, artifactID string) (string, erro
 // ComposeWithAnnotations is like Compose but adds HTML comment annotations
 // with fragment IDs before each section, useful for model context and debugging.
 func (c *Composer) ComposeWithAnnotations(ctx context.Context, artifactID string) (string, error) {
-	frags, err := c.queryFragments(ctx, artifactID)
-	if err != nil {
-		return "", err
-	}
-
-	if len(frags) == 0 {
-		return "", nil
-	}
-
 	type annotatedFrag struct {
 		composedFragment
 		FragmentID        string
 		FragmentVersionID string
 	}
 
-	// Re-query with IDs for annotations.
+	// Query fragments with IDs for annotations.
 	rows, err := c.db.QueryContext(ctx, `
 		SELECT f.id, fv.id, f.heading, f.depth, fv.content, af.position
 		FROM artifact_fragments af
@@ -110,6 +101,10 @@ func (c *Composer) ComposeWithAnnotations(ctx context.Context, artifactID string
 	}
 	if err := rows.Err(); err != nil {
 		return "", err
+	}
+
+	if len(annotated) == 0 {
+		return "", nil
 	}
 
 	var b strings.Builder

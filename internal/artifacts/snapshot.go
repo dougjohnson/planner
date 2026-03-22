@@ -45,12 +45,6 @@ func (sc *SnapshotCreator) CreateSnapshot(ctx context.Context, input SnapshotInp
 		return nil, fmt.Errorf("at least one fragment version ID is required")
 	}
 
-	// Auto-increment version label.
-	versionLabel, err := sc.nextVersionLabel(ctx, input.ProjectID, input.ArtifactType, input.VersionSuffix)
-	if err != nil {
-		return nil, fmt.Errorf("computing version label: %w", err)
-	}
-
 	artifactID := uuid.NewString()
 	now := time.Now().UTC().Format(time.RFC3339)
 
@@ -60,11 +54,28 @@ func (sc *SnapshotCreator) CreateSnapshot(ctx context.Context, input SnapshotInp
 	}
 	defer tx.Rollback()
 
-	// Create artifact row.
+	// Compute version label INSIDE the transaction to prevent race conditions
+	// where concurrent snapshot creations could get the same count.
+	versionLabel, err := sc.nextVersionLabelTx(ctx, tx, input.ProjectID, input.ArtifactType, input.VersionSuffix)
+	if err != nil {
+		return nil, fmt.Errorf("computing version label: %w", err)
+	}
+
+	// If promoting to canonical, clear is_canonical on all existing artifacts
+	// for this project+type first (within the same transaction).
 	canonical := 0
 	if input.IsCanonical {
 		canonical = 1
+		_, err = tx.ExecContext(ctx, `
+			UPDATE artifacts SET is_canonical = 0
+			WHERE project_id = ? AND artifact_type = ? AND is_canonical = 1
+		`, input.ProjectID, input.ArtifactType)
+		if err != nil {
+			return nil, fmt.Errorf("clearing previous canonical: %w", err)
+		}
 	}
+
+	// Create artifact row.
 	_, err = tx.ExecContext(ctx, `
 		INSERT INTO artifacts (id, project_id, artifact_type, version_label, source_stage, source_model, is_canonical, created_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -108,10 +119,11 @@ func (sc *SnapshotCreator) CreateSnapshot(ctx context.Context, input SnapshotInp
 	}, nil
 }
 
-// nextVersionLabel computes the next version label for a project+type.
-func (sc *SnapshotCreator) nextVersionLabel(ctx context.Context, projectID, artifactType, suffix string) (string, error) {
+// nextVersionLabelTx computes the next version label INSIDE a transaction
+// to prevent race conditions with concurrent snapshot creations.
+func (sc *SnapshotCreator) nextVersionLabelTx(ctx context.Context, tx *sql.Tx, projectID, artifactType, suffix string) (string, error) {
 	var count int
-	err := sc.db.QueryRowContext(ctx, `
+	err := tx.QueryRowContext(ctx, `
 		SELECT COUNT(*) FROM artifacts WHERE project_id = ? AND artifact_type = ?
 	`, projectID, artifactType).Scan(&count)
 	if err != nil {

@@ -32,7 +32,6 @@ type Stage3Orchestrator struct {
 
 // NewStage3Orchestrator creates a new Stage 3 orchestrator.
 func NewStage3Orchestrator(
-	db interface{ /* sql.DB */ },
 	fragStore *fragments.Store,
 	snapCreator *artifacts.SnapshotCreator,
 	artStore *artifacts.Store,

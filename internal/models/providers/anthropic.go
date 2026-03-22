@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/dougflynn/flywheel-planner/internal/models"
@@ -96,9 +97,14 @@ func (p *AnthropicProvider) Execute(ctx context.Context, req models.SessionReque
 	}
 
 	// Build Anthropic request body.
+	// Anthropic uses a top-level "system" parameter, not a system-role message.
+	systemText := extractSystemMessages(req.Messages)
 	body := map[string]any{
 		"model":    modelID,
 		"messages": convertMessagesForAnthropic(req.Messages),
+	}
+	if systemText != "" {
+		body["system"] = systemText
 	}
 	if req.MaxTokens > 0 {
 		body["max_tokens"] = req.MaxTokens
@@ -147,9 +153,20 @@ func (p *AnthropicProvider) setHeaders(req *http.Request) {
 	req.Header.Set("Content-Type", "application/json")
 }
 
+// extractSystemMessages concatenates all system-role messages into a single
+// string for the Anthropic API's top-level "system" parameter.
+func extractSystemMessages(msgs []models.Message) string {
+	var parts []string
+	for _, m := range msgs {
+		if m.Role == "system" && m.Content != "" {
+			parts = append(parts, m.Content)
+		}
+	}
+	return strings.Join(parts, "\n\n")
+}
+
 func convertMessagesForAnthropic(msgs []models.Message) []map[string]any {
-	// Anthropic uses system as a top-level param, not in messages.
-	// For simplicity, we pass all messages and let the caller handle system extraction.
+	// System messages are extracted separately via extractSystemMessages.
 	result := make([]map[string]any, 0, len(msgs))
 	for _, m := range msgs {
 		if m.Role == "system" {

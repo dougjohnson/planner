@@ -123,7 +123,7 @@ func (p *Publisher) ListByProject(ctx context.Context, projectID string, limit i
 	}
 	defer rows.Close()
 
-	var events []StoredEvent
+	events := make([]StoredEvent, 0)
 	for rows.Next() {
 		var e StoredEvent
 		var runID sql.NullString

@@ -2,7 +2,9 @@
 package handlers
 
 import (
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -86,7 +88,12 @@ func (h *ProjectHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 
 	project, err := h.repo.GetByID(r.Context(), id)
 	if err != nil {
-		response.NotFound(w, "project not found")
+		if errors.Is(err, sql.ErrNoRows) {
+			response.NotFound(w, "project not found")
+		} else {
+			h.logger.Error("getting project", "id", id, "error", err)
+			response.InternalError(w, "failed to get project")
+		}
 		return
 	}
 
@@ -124,7 +131,12 @@ func (h *ProjectHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	project, err := h.repo.Update(r.Context(), id, updates)
 	if err != nil {
-		response.NotFound(w, "project not found")
+		if strings.Contains(err.Error(), "not found") {
+			response.NotFound(w, "project not found")
+		} else {
+			h.logger.Error("updating project", "id", id, "error", err)
+			response.InternalError(w, "failed to update project")
+		}
 		return
 	}
 

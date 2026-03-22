@@ -135,10 +135,12 @@ func (o *ParallelOrchestrator) Execute(ctx context.Context, req ParallelGenerati
 	for _, provName := range req.Providers {
 		session, ok := req.SessionsByProvider[provName]
 		if !ok {
+			mu.Lock()
 			failures = append(failures, ProviderFailure{
 				Provider: provName,
 				Error:    "no session configured for provider",
 			})
+			mu.Unlock()
 			continue
 		}
 

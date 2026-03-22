@@ -60,10 +60,12 @@ func (h *FoundationsHandler) Submit(w http.ResponseWriter, r *http.Request) {
 		ArchitectureDirection: req.ArchitectureDirection,
 	}
 
-	for _, guide := range req.BuiltInGuides {
+	// Auto-attach built-in guides for known stacks using proper filenames.
+	knownGuides := foundations.KnownStackGuides(req.TechStack)
+	for _, g := range knownGuides {
 		input.BuiltInGuides = append(input.BuiltInGuides, foundations.GuideReference{
-			Name:     guide,
-			Filename: guide + ".md",
+			Name:     g.Name,
+			Filename: g.Filename,
 			Source:   "built_in",
 		})
 	}
@@ -81,7 +83,12 @@ func (h *FoundationsHandler) Submit(w http.ResponseWriter, r *http.Request) {
 		ProjectName: req.ProjectName,
 		Languages:   req.TechStack,
 	}
-	techStackMD, _ := foundations.GenerateTechStack(techStackInput)
+	techStackMD, err := foundations.GenerateTechStack(techStackInput)
+	if err != nil {
+		h.logger.Error("generating tech stack", "error", err)
+		response.InternalError(w, "failed to generate tech stack")
+		return
+	}
 
 	h.logger.Info("foundations submitted",
 		"project_id", projectID,
@@ -115,6 +122,16 @@ func (h *FoundationsHandler) Update(w http.ResponseWriter, r *http.Request) {
 		ArchitectureDirection: req.ArchitectureDirection,
 	}
 
+	// Auto-attach built-in guides for Update as well.
+	knownGuides2 := foundations.KnownStackGuides(req.TechStack)
+	for _, g := range knownGuides2 {
+		input.BuiltInGuides = append(input.BuiltInGuides, foundations.GuideReference{
+			Name:     g.Name,
+			Filename: g.Filename,
+			Source:   "built_in",
+		})
+	}
+
 	agentsMD, err := foundations.AssembleAgentsMD(input)
 	if err != nil {
 		h.logger.Error("assembling AGENTS.md", "error", err)
@@ -122,11 +139,15 @@ func (h *FoundationsHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	techStackInput2 := foundations.TechStackInput{
+	techStackMD, err := foundations.GenerateTechStack(foundations.TechStackInput{
 		ProjectName: req.ProjectName,
 		Languages:   req.TechStack,
+	})
+	if err != nil {
+		h.logger.Error("generating tech stack", "error", err)
+		response.InternalError(w, "failed to generate tech stack")
+		return
 	}
-	techStackMD, _ := foundations.GenerateTechStack(techStackInput2)
 
 	h.logger.Info("foundations updated", "project_id", projectID)
 
