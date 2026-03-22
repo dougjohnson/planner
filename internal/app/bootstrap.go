@@ -262,6 +262,101 @@ func Bootstrap(ctx context.Context, cfg *Config, db *sql.DB, logger *slog.Logger
 		},
 	))
 
+	// Register Stage 10 handler (parallel plan generation — mirrors Stage 3).
+	dispatcher.Register("parallel_plan_generation", engine.StageHandlerFunc(
+		func(ctx context.Context, projectID, workflowRunID string) error {
+			// Load the canonical PRD for context.
+			var prdContent string
+			db.QueryRowContext(ctx,
+				`SELECT content_path FROM project_inputs
+				 WHERE project_id = ? AND role = 'seed_prd'
+				 ORDER BY created_at DESC LIMIT 1`, projectID,
+			).Scan(&prdContent)
+
+			result, err := stage3Orch.Execute(ctx, projectID, workflowRunID, prdContent, "")
+			if err != nil {
+				return err
+			}
+			if !result.QuorumMet {
+				return fmt.Errorf("plan generation quorum not met")
+			}
+			db.ExecContext(ctx,
+				`UPDATE projects SET current_stage = 'plan_synthesis' WHERE id = ?`, projectID)
+			return nil
+		},
+	))
+
+	// Register Stage 11 handler (plan synthesis — GPT).
+	dispatcher.Register("plan_synthesis", engine.StageHandlerFunc(
+		func(ctx context.Context, projectID, _ string) error {
+			gptProvider := providerRegistry.Get(models.ProviderOpenAI)
+			if gptProvider == nil {
+				return fmt.Errorf("GPT provider not registered")
+			}
+			_, err := stages.ExecuteSynthesis(ctx, db, gptProvider,
+				stages.PlanSynthesisConfig(), projectID, "", logger)
+			if err != nil {
+				return err
+			}
+			db.ExecContext(ctx,
+				`UPDATE projects SET current_stage = 'plan_integration' WHERE id = ?`, projectID)
+			return nil
+		},
+	))
+
+	// Register Stage 12 handler (plan integration — Opus).
+	dispatcher.Register("plan_integration", engine.StageHandlerFunc(
+		func(ctx context.Context, projectID, _ string) error {
+			opusProvider := providerRegistry.Get(models.ProviderAnthropic)
+			if opusProvider == nil {
+				return fmt.Errorf("Opus provider not registered")
+			}
+			result, err := stages.ExecuteIntegration(ctx, db, opusProvider,
+				stages.PlanIntegrationConfig(), projectID, "", logger)
+			if err != nil {
+				return err
+			}
+			nextStage := "plan_review"
+			if result.HasDisagreements {
+				nextStage = "plan_disagreement_review"
+			}
+			db.ExecContext(ctx,
+				`UPDATE projects SET current_stage = ? WHERE id = ?`, nextStage, projectID)
+			return nil
+		},
+	))
+
+	// Register Stage 14 handler (plan review + commit).
+	dispatcher.Register("plan_review", engine.StageHandlerFunc(
+		func(ctx context.Context, projectID, _ string) error {
+			provider := providerRegistry.Get(models.ProviderOpenAI)
+			if provider == nil {
+				return fmt.Errorf("GPT provider not registered")
+			}
+			reviewResult, err := stages.ExecuteReview(ctx, db, provider,
+				stages.PlanReviewConfig("gpt"), projectID, "", logger)
+			if err != nil {
+				return err
+			}
+			if !reviewResult.NoChanges && len(reviewResult.Operations) > 0 {
+				var canonicalID string
+				db.QueryRowContext(ctx,
+					`SELECT id FROM artifacts WHERE project_id = ? AND artifact_type = 'plan' AND is_canonical = 1
+					 ORDER BY created_at DESC LIMIT 1`, projectID,
+				).Scan(&canonicalID)
+				if canonicalID != "" {
+					workflow.CommitFragmentOperations(
+						ctx, db, projectID, canonicalID,
+						reviewResult.Operations, "plan_review", "", "plan")
+				}
+			}
+			// Advance to export.
+			db.ExecContext(ctx,
+				`UPDATE projects SET current_stage = 'final_export' WHERE id = ?`, projectID)
+			return nil
+		},
+	))
+
 	// Step 14: Build API handlers.
 	projectHandler := handlers.NewProjectHandler(projectRepo, logger)
 	workflowHandler := handlers.NewWorkflowHandler(db, eventPublisher, logger)
