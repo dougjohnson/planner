@@ -1,0 +1,215 @@
+/* ─────────────────────────────────────────────────────────
+   ReviewStage — Stage 6/13 disagreement review workspace
+   ───────────────────────────────────────────────────────── */
+
+.page {
+  max-width: 56rem;
+}
+
+.header {
+  margin-bottom: var(--space-6);
+}
+
+.header h1 {
+  margin-bottom: var(--space-2);
+}
+
+.header p {
+  font-size: var(--text-base);
+  color: var(--color-text-secondary);
+}
+
+/* ── Bulk actions ── */
+
+.bulkActions {
+  display: flex;
+  gap: var(--space-2);
+  margin-bottom: var(--space-5);
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+}
+
+/* ── Review item list ── */
+
+.itemList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* ── Individual review item ── */
+
+.itemHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.fragmentId {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  background: var(--color-bg-subtle);
+  padding: 0.125rem 0.4rem;
+  border-radius: var(--radius-sm);
+}
+
+.rationale {
+  font-style: italic;
+  color: var(--color-text-secondary);
+  font-size: var(--text-base);
+  margin-bottom: var(--space-3);
+  line-height: 1.5;
+}
+
+.suggestedChange {
+  background: var(--color-success-light);
+  border: 1px solid #bbf7d0;
+  padding: var(--space-3);
+  border-radius: var(--radius-sm);
+  margin-bottom: var(--space-3);
+}
+
+.suggestedChange strong {
+  display: block;
+  font-size: var(--text-sm);
+  color: #166534;
+  margin-bottom: var(--space-1);
+}
+
+.suggestedChange p {
+  font-size: var(--text-base);
+  color: #14532d;
+}
+
+/* ── Decision buttons ── */
+
+.decisionGroup {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.acceptBtn {
+  background: transparent;
+  color: #166534;
+  border: 1px solid #86efac;
+  border-radius: var(--radius-sm);
+  padding: 0.375rem 0.875rem;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.acceptBtn:hover {
+  background: var(--color-success-light);
+}
+
+.acceptBtn[aria-pressed="true"] {
+  background: var(--color-success);
+  color: #fff;
+  border-color: var(--color-success);
+}
+
+.rejectBtn {
+  background: transparent;
+  color: #991b1b;
+  border: 1px solid #fca5a5;
+  border-radius: var(--radius-sm);
+  padding: 0.375rem 0.875rem;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.rejectBtn:hover {
+  background: var(--color-error-light);
+}
+
+.rejectBtn[aria-pressed="true"] {
+  background: var(--color-error);
+  color: #fff;
+  border-color: var(--color-error);
+}
+
+/* ── Decision confirmation + note ── */
+
+.decisionConfirm {
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border);
+}
+
+.noteLabel {
+  display: block;
+  margin-top: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+.noteTextarea {
+  width: 100%;
+  margin-top: var(--space-1);
+  resize: vertical;
+  min-height: 3rem;
+}
+
+/* ── Guidance section ── */
+
+.guidanceSection {
+  margin-top: var(--space-8);
+}
+
+.guidanceModes {
+  display: flex;
+  gap: var(--space-5);
+  margin: var(--space-3) 0;
+}
+
+.guidanceModes label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.guidanceTextarea {
+  width: 100%;
+  min-height: 5rem;
+  resize: vertical;
+}
+
+/* ── Submit bar ── */
+
+.submitBar {
+  margin-top: var(--space-6);
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.submitWarning {
+  color: var(--color-error);
+  font-size: var(--text-sm);
+}
+
+/* ── Empty state ── */
+
+.emptyState {
+  text-align: center;
+  padding: var(--space-12) var(--space-6);
+}
+
+.emptyState h1 {
+  margin-bottom: var(--space-2);
+}
+
+.emptyState p {
+  color: var(--color-text-muted);
+}

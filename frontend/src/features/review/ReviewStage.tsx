@@ -1,7 +1,17 @@
 import { useState } from "react";
 import { useParams } from "react-router-dom";
 import { useReviewItems, useSubmitDecisions } from "../../hooks/useApi";
-import { Badge, Button, Card, CardBody, CardHeader, StatusChip } from "../../components/ui";
+import {
+  Badge,
+  Button,
+  Card,
+  CardBody,
+  CardHeader,
+  LoadingState,
+  ErrorState,
+  StatusChip,
+} from "../../components/ui";
+import styles from "./ReviewStage.module.css";
 
 type Decision = "accepted" | "rejected";
 
@@ -68,16 +78,16 @@ export default function ReviewStage() {
   };
 
   if (isLoading) {
-    return <div role="status" aria-label="Loading review items">Loading review items...</div>;
+    return <LoadingState message="Loading review items..." />;
   }
 
   if (error) {
-    return <div role="alert">Error loading review items: {error.message}</div>;
+    return <ErrorState message={`Error loading review items: ${error.message}`} />;
   }
 
   if (!pendingItems || pendingItems.length === 0) {
     return (
-      <div>
+      <div className={styles.emptyState}>
         <h1>Review: Stage {stage}</h1>
         <p>No disagreements to review. The integration pass produced full agreement.</p>
         <p>Proceeding to the review loop.</p>
@@ -86,88 +96,79 @@ export default function ReviewStage() {
   }
 
   return (
-    <div>
-      <header>
-        <h1>Review Disagreements: Stage {stage}</h1>
+    <div className={styles.page}>
+      <header className={styles.header}>
+        <h1>Review Disagreements</h1>
         <p>
           {pendingItems.length} disputed change{pendingItems.length !== 1 ? "s" : ""} to resolve.
+          Review each item and accept or reject the proposed change.
         </p>
       </header>
 
-      <div style={{ display: "flex", gap: "8px", margin: "16px 0" }}>
-        <Button onClick={() => handleBulkAction("accepted")}>Accept All</Button>
-        <Button onClick={() => handleBulkAction("rejected")}>Reject All</Button>
+      <div className={styles.bulkActions}>
+        <Button size="sm" variant="secondary" onClick={() => handleBulkAction("accepted")}>
+          Accept All
+        </Button>
+        <Button size="sm" variant="secondary" onClick={() => handleBulkAction("rejected")}>
+          Reject All
+        </Button>
       </div>
 
-      <div role="list" aria-label="Review items">
+      <div className={styles.itemList} role="list" aria-label="Review items">
         {pendingItems.map((item) => (
-          <Card key={item.id} style={{ marginBottom: "16px" }}>
+          <Card key={item.id}>
             <CardHeader>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <div className={styles.itemHeader}>
                 <Badge variant={severityVariant(item.severity)}>{item.severity}</Badge>
                 <span>{item.summary}</span>
                 {item.fragment_id && (
-                  <code style={{ fontSize: "0.85em", color: "#666" }}>{item.fragment_id}</code>
+                  <code className={styles.fragmentId}>{item.fragment_id}</code>
                 )}
               </div>
             </CardHeader>
             <CardBody>
-              {item.rationale && (
-                <p style={{ marginBottom: "8px", fontStyle: "italic" }}>{item.rationale}</p>
-              )}
+              {item.rationale && <p className={styles.rationale}>{item.rationale}</p>}
+
               {item.suggested_change && (
-                <div
-                  style={{
-                    background: "#f0fdf4",
-                    padding: "8px",
-                    borderRadius: "4px",
-                    marginBottom: "8px",
-                  }}
-                >
-                  <strong>Suggested change:</strong>
+                <div className={styles.suggestedChange}>
+                  <strong>Suggested change</strong>
                   <p>{item.suggested_change}</p>
                 </div>
               )}
 
               <div
+                className={styles.decisionGroup}
                 role="group"
                 aria-label={`Decision for ${item.summary}`}
-                style={{ display: "flex", gap: "8px", marginTop: "8px" }}
               >
-                <Button
+                <button
+                  className={styles.acceptBtn}
                   onClick={() => setDecision(item.id, "accepted")}
                   aria-pressed={decisions[item.id]?.decision === "accepted"}
-                  style={{
-                    background: decisions[item.id]?.decision === "accepted" ? "#22c55e" : undefined,
-                    color: decisions[item.id]?.decision === "accepted" ? "white" : undefined,
-                  }}
                 >
                   Accept
-                </Button>
-                <Button
+                </button>
+                <button
+                  className={styles.rejectBtn}
                   onClick={() => setDecision(item.id, "rejected")}
                   aria-pressed={decisions[item.id]?.decision === "rejected"}
-                  style={{
-                    background: decisions[item.id]?.decision === "rejected" ? "#ef4444" : undefined,
-                    color: decisions[item.id]?.decision === "rejected" ? "white" : undefined,
-                  }}
                 >
                   Reject
-                </Button>
+                </button>
               </div>
 
               {decisions[item.id] && (
-                <div style={{ marginTop: "8px" }}>
+                <div className={styles.decisionConfirm}>
                   <StatusChip
                     status={decisions[item.id].decision === "accepted" ? "completed" : "failed"}
                   />
-                  <label style={{ display: "block", marginTop: "4px" }}>
-                    Note (optional):
+                  <label className={styles.noteLabel}>
+                    Note (optional)
                     <textarea
+                      className={styles.noteTextarea}
                       value={decisions[item.id]?.userNote ?? ""}
                       onChange={(e) => setNote(item.id, e.target.value)}
                       rows={2}
-                      style={{ width: "100%", marginTop: "4px" }}
                       aria-label={`Note for ${item.summary}`}
                     />
                   </label>
@@ -178,20 +179,21 @@ export default function ReviewStage() {
         ))}
       </div>
 
-      <Card style={{ marginTop: "24px" }}>
+      <Card className={styles.guidanceSection}>
         <CardHeader>User Guidance</CardHeader>
         <CardBody>
           <p>Optionally provide guidance for the next workflow step.</p>
-          <div role="radiogroup" aria-label="Guidance mode" style={{ margin: "8px 0" }}>
-            <label style={{ marginRight: "16px" }}>
+          <div className={styles.guidanceModes} role="radiogroup" aria-label="Guidance mode">
+            <label>
               <input
                 type="radio"
                 name="guidanceMode"
                 value="advisory_only"
                 checked={guidanceMode === "advisory_only"}
                 onChange={() => setGuidanceMode("advisory_only")}
-              />{" "}
-              <Badge variant="info">Advisory</Badge> Carried into next step
+              />
+              <Badge variant="info">Advisory</Badge>
+              Carried into next step
             </label>
             <label>
               <input
@@ -200,27 +202,28 @@ export default function ReviewStage() {
                 value="decision_record"
                 checked={guidanceMode === "decision_record"}
                 onChange={() => setGuidanceMode("decision_record")}
-              />{" "}
-              <Badge variant="default">Decision Record</Badge> Explains your decisions
+              />
+              <Badge variant="default">Decision Record</Badge>
+              Explains your decisions
             </label>
           </div>
           <textarea
+            className={styles.guidanceTextarea}
             value={guidanceText}
             onChange={(e) => setGuidanceText(e.target.value)}
             rows={4}
             placeholder="Enter guidance for the model in the next stage..."
-            style={{ width: "100%" }}
             aria-label="Guidance text"
           />
         </CardBody>
       </Card>
 
-      <div style={{ marginTop: "24px" }}>
+      <div className={styles.submitBar}>
         <Button onClick={handleSubmit} disabled={!allDecided || submitting}>
           {submitting ? "Submitting..." : `Submit ${Object.keys(decisions).length} Decisions`}
         </Button>
         {!allDecided && (
-          <p style={{ color: "#b91c1c", marginTop: "8px" }}>
+          <p className={styles.submitWarning}>
             All items must have a decision before submitting.
           </p>
         )}
