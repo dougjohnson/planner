@@ -452,13 +452,13 @@ bv --robot-triage --format toon
 4. Pick the **single highest-priority item** that you are confident you can complete
 5. **Never cherry-pick a lower-priority item** unless all higher-priority items are blocked or beyond your capabilities
 
-### Step 2: Claim — Tell the system you're working on it. THIS IS IMPORTANT, OTHERWISE ANOTHER AGENT MAY PICK THIS BEAD BEFORE YOU AND START WORKING ON IT!
+### Step 2: Claim — Tell the system (and other agents) you're working on it. THIS IS IMPORTANT, OTHERWISE ANOTHER AGENT MAY PICK THIS BEAD AND WORK ON IT AT THE SAME TIME AS YOU!
 
 ```bash
 br update <id> --status=in_progress
 ```
 
-If Agent Mail is available, also reserve the files you'll edit and announce your work:
+Use Agent Mail to reserve the files you'll edit and announce your work (only skip this if Agent Mail is not available or you're working solo):
 
 ```
 # Reserve the edit surface (prevents other agents from editing the same files)
@@ -480,11 +480,11 @@ Reply in-thread via Agent Mail with progress updates if working in a multi-agent
 # Close the issue
 br close <id> --reason "Completed: <brief summary>"
 
-# Export to JSONL (NEVER skips this — br doesn't auto-export)
+# Export to JSONL (NEVER skip this — br doesn't auto-export)
 br sync --flush-only
 ```
 
-If Agent Mail is active:
+Announce completion in Agent Mail (only skip if unavailable or solo):
 ```
 # Release file reservations
 release_file_reservations(project_key, agent_name, paths=["pkg/relevant/**"])
