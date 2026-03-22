@@ -85,7 +85,10 @@ A comprehensive product for managing workflows.
     const statusResp = await request.get(`/api/projects/${projectId}/workflow`);
     expect(statusResp.ok()).toBe(true);
     const { data: workflow } = await statusResp.json();
-    expect(workflow.current_stage).toBe('parallel_prd_generation');
+    // Stage 3 should be ready (current stage is parallel_prd_generation).
+    const stage3 = workflow.stages.find((s: any) => s.key === 'parallel_prd_generation');
+    expect(stage3).toBeDefined();
+    expect(stage3.status).toBe('ready');
 
     // 8. Start Stage 3 via API.
     const startResp = await request.post(
@@ -136,7 +139,7 @@ A comprehensive product for managing workflows.
     const { data: workflow } = await statusResp.json();
 
     expect(workflow.stages).toHaveLength(17);
-    expect(workflow.stages[0].id).toBe('foundations');
-    expect(workflow.stages[16].id).toBeTruthy();
+    expect(workflow.stages[0].key).toBe('foundations');
+    expect(workflow.stages[16].key).toBeTruthy();
   });
 });

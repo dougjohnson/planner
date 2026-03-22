@@ -47,12 +47,14 @@ func TestGetWorkflowStatus(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected data envelope, got %v", envelope)
 	}
-	if data["project_id"] != "p-1" {
-		t.Errorf("expected project_id 'p-1', got %v", data["project_id"])
+	// Response now includes "project" object matching frontend WorkflowStatusSchema.
+	project, _ := data["project"].(map[string]any)
+	if project == nil || project["id"] != "p-1" {
+		t.Errorf("expected project.id 'p-1', got %v", project)
 	}
 	stages, _ := data["stages"].([]any)
-	if len(stages) == 0 {
-		t.Error("expected non-empty stages list")
+	if len(stages) != 17 {
+		t.Errorf("expected 17 stages, got %d", len(stages))
 	}
 }
 

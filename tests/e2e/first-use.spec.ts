@@ -95,14 +95,13 @@ test.describe('First-use experience', () => {
     expect(statusResp.ok()).toBe(true);
     const { data: status } = await statusResp.json();
 
-    expect(status.project_id).toBe(project.id);
+    expect(status.project.id).toBe(project.id);
     expect(status.stages).toBeDefined();
     expect(Array.isArray(status.stages)).toBe(true);
     expect(status.stages.length).toBe(17);
 
     const firstStage = status.stages[0];
-    expect(firstStage.id).toBe('foundations');
-    expect(firstStage.name).toBeTruthy();
-    expect(firstStage.number).toBe(1);
+    expect(firstStage.key).toBe('foundations');
+    expect(firstStage.stage).toBe(1);
   });
 });

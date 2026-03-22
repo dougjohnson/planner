@@ -54,21 +54,31 @@ type StageActionRequest struct {
 	IdempotencyKey string `json:"idempotency_key,omitempty"`
 }
 
-// WorkflowStatusResponse is the DTO for GET /workflow.
+// WorkflowStatusResponse matches the frontend WorkflowStatusSchema.
 type WorkflowStatusResponse struct {
-	ProjectID    string      `json:"project_id"`
-	CurrentStage string      `json:"current_stage"`
-	Stages       []StageInfo `json:"stages"`
-	EventCount   int         `json:"event_count"`
+	Project        any              `json:"project"`
+	Stages         []StageInfo      `json:"stages"`
+	Runs           []RunInfo        `json:"runs"`
+	PendingReviews []any            `json:"pending_reviews"`
 }
 
-// StageInfo describes a stage's current state.
+// StageInfo matches the frontend StageSchema: {stage, key, status, loop_iteration, pending_review_count}.
 type StageInfo struct {
-	ID       string               `json:"id"`
-	Name     string               `json:"name"`
-	Number   int                  `json:"number"`
-	Status   workflow.StageStatus `json:"status"`
-	RunCount int                  `json:"run_count"`
+	Stage              int                  `json:"stage"`
+	Key                string               `json:"key"`
+	Status             workflow.StageStatus `json:"status"`
+	LoopIteration      int                  `json:"loop_iteration"`
+	PendingReviewCount int                  `json:"pending_review_count"`
+}
+
+// RunInfo matches the frontend WorkflowRunSchema.
+type RunInfo struct {
+	ID           string `json:"id"`
+	StageKey     string `json:"stage_key"`
+	Model        string `json:"model"`
+	Status       string `json:"status"`
+	Attempt      int    `json:"attempt"`
+	ErrorMessage string `json:"error_message,omitempty"`
 }
 
 // stageRunInfo holds aggregated run data for a single stage.
@@ -113,39 +123,85 @@ func (h *WorkflowHandler) GetStatus(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Build stage info with real statuses.
+	// Build stage info matching frontend StageSchema.
 	defs := workflow.AllStages()
 	reachedCurrent := false
-	stages := make([]StageInfo, 0, len(defs))
+	stageInfos := make([]StageInfo, 0, len(defs))
 
 	for _, d := range defs {
 		status := computeStageStatus(d.ID, currentStage, stageRuns, &reachedCurrent)
-		info := StageInfo{
-			ID:     d.ID,
-			Name:   d.Name,
-			Number: d.PRDNumber,
-			Status: status,
-		}
-		if ri, ok := stageRuns[d.ID]; ok {
-			info.RunCount = ri.runCount
-		}
-		stages = append(stages, info)
+		stageInfos = append(stageInfos, StageInfo{
+			Stage:              d.PRDNumber,
+			Key:                d.ID,
+			Status:             status,
+			LoopIteration:      0,
+			PendingReviewCount: 0,
+		})
 	}
 
-	// Count events.
-	eventCount := 0
-	if h.eventPublisher != nil {
-		evts, err := h.eventPublisher.ListByProject(ctx, projectID, 0)
-		if err == nil {
-			eventCount = len(evts)
+	// Load recent runs matching frontend WorkflowRunSchema.
+	var runs []RunInfo
+	runRows, err := h.db.QueryContext(ctx, `
+		SELECT wr.id, wr.stage, COALESCE(mc.model_name, ''), wr.status, wr.attempt, wr.error_message
+		FROM workflow_runs wr
+		LEFT JOIN model_configs mc ON mc.id = wr.model_config_id
+		WHERE wr.project_id = ?
+		ORDER BY wr.created_at DESC LIMIT 20`, projectID)
+	if err == nil {
+		defer runRows.Close()
+		for runRows.Next() {
+			var r RunInfo
+			if runRows.Scan(&r.ID, &r.StageKey, &r.Model, &r.Status, &r.Attempt, &r.ErrorMessage) == nil {
+				runs = append(runs, r)
+			}
 		}
+	}
+	if runs == nil {
+		runs = []RunInfo{}
+	}
+
+	// Load pending review items.
+	var pendingReviews []any
+	reviewRows, err := h.db.QueryContext(ctx, `
+		SELECT id, fragment_id, COALESCE(classification, '') as severity, summary,
+			COALESCE(diff_ref, '') as rationale, COALESCE(diff_ref, '') as suggested_change, status
+		FROM review_items
+		WHERE project_id = ? AND status = 'pending'`, projectID)
+	if err == nil {
+		defer reviewRows.Close()
+		for reviewRows.Next() {
+			var id, fragID, severity, summary, rationale, suggestedChange, status string
+			if reviewRows.Scan(&id, &fragID, &severity, &summary, &rationale, &suggestedChange, &status) == nil {
+				pendingReviews = append(pendingReviews, map[string]any{
+					"id": id, "fragment_id": fragID, "severity": severity,
+					"summary": summary, "rationale": rationale,
+					"suggested_change": suggestedChange, "status": status,
+				})
+			}
+		}
+	}
+	if pendingReviews == nil {
+		pendingReviews = []any{}
+	}
+
+	// Load full project for the "project" field.
+	var projName, projDesc, projStatus, projWfState, projCreated, projUpdated string
+	h.db.QueryRowContext(ctx,
+		`SELECT name, description, status, workflow_definition_version, created_at, updated_at
+		 FROM projects WHERE id = ?`, projectID).Scan(
+		&projName, &projDesc, &projStatus, &projWfState, &projCreated, &projUpdated)
+
+	projectData := map[string]any{
+		"id": projectID, "name": projName, "description": projDesc,
+		"status": projStatus, "workflow_state": projWfState,
+		"created_at": projCreated, "updated_at": projUpdated,
 	}
 
 	response.JSON(w, http.StatusOK, WorkflowStatusResponse{
-		ProjectID:    projectID,
-		CurrentStage: currentStage,
-		Stages:       stages,
-		EventCount:   eventCount,
+		Project:        projectData,
+		Stages:         stageInfos,
+		Runs:           runs,
+		PendingReviews: pendingReviews,
 	})
 }
 
@@ -157,6 +213,11 @@ func computeStageStatus(
 	stageRuns map[string]stageRunInfo,
 	reachedCurrent *bool,
 ) workflow.StageStatus {
+	// Track position regardless of run data — needed for stages after current.
+	if stageID == currentStage {
+		*reachedCurrent = true
+	}
+
 	// If we have run data for this stage, use the latest run status.
 	if ri, ok := stageRuns[stageID]; ok {
 		switch ri.latestStatus {
@@ -183,7 +244,6 @@ func computeStageStatus(
 	}
 
 	if stageID == currentStage {
-		*reachedCurrent = true
 		return workflow.StageReady
 	}
 
