@@ -1,9 +1,12 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, lazy, Suspense } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Button, Badge, Card, CardHeader, CardBody } from "../../components/ui";
 import { LoadingState, ErrorState } from "../../components/ui";
 import { get, post } from "../../lib/api-client";
 import styles from "./Foundations.module.css";
+
+// Lazy-load seed PRD intake to keep the foundations bundle small.
+const SeedPRDIntake = lazy(() => import("../prd/SeedPRDIntake"));
 
 interface FoundationFile {
   name: string;
@@ -25,6 +28,7 @@ export default function Foundations() {
   const [customGuide, setCustomGuide] = useState<File | null>(null);
   const [files, setFiles] = useState<FoundationFile[]>([]);
   const [locked, setLocked] = useState(false);
+  const [currentStage, setCurrentStage] = useState("");
   const [saving, setSaving] = useState(false);
   const [locking, setLocking] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -38,6 +42,7 @@ export default function Foundations() {
         const project = await get<ProjectData>(`/projects/${projectId}`);
         if (cancelled) return;
         setProjectName(project.name);
+        setCurrentStage(project.current_stage ?? "");
         if (project.current_stage && project.current_stage !== "" && project.current_stage !== "foundations") {
           setLocked(true);
         }
@@ -104,9 +109,11 @@ export default function Foundations() {
     try {
       await post(`/projects/${projectId}/foundations/lock`, {});
       setLocked(true);
+      setCurrentStage("prd_intake");
     } catch {
       // If lock endpoint isn't fully wired, lock locally.
       setLocked(true);
+      setCurrentStage("prd_intake");
     } finally {
       setLocking(false);
     }
@@ -128,35 +135,55 @@ export default function Foundations() {
   if (error) return <ErrorState message={error} />;
 
   if (locked) {
+    // Determine if the user still needs to enter a seed PRD.
+    const needsSeedPRD = currentStage === "prd_intake" || currentStage === "foundations";
+    const pastSeedPRD = currentStage !== "" && currentStage !== "foundations" && currentStage !== "prd_intake";
+
     return (
       <div className={styles.container}>
-        <h1 className={styles.heading}>Foundations</h1>
-        <Badge variant="success">Locked</Badge>
-        <p className={styles.lockedMsg}>
-          Foundations are locked. You can now upload your seed PRD to begin the planning workflow.
-        </p>
-        {files.length > 0 && (
-          <div className={styles.fileList}>
-            {files.map((f) => (
-              <Card key={f.name}>
-                <CardHeader>
-                  {f.name} <Badge variant={f.source === "uploaded" ? "info" : "default"}>{f.source}</Badge>
-                </CardHeader>
-                <CardBody>
-                  <pre className={styles.preview}>{f.content}</pre>
-                </CardBody>
-              </Card>
-            ))}
+        <h1 className={styles.heading}>Foundations & Seed PRD</h1>
+
+        {/* Locked foundations section */}
+        <div style={{ marginBottom: "var(--space-6, 1.5rem)" }}>
+          <Badge variant="success">Foundations Locked</Badge>
+          {files.length > 0 && (
+            <div className={styles.fileList}>
+              {files.map((f) => (
+                <Card key={f.name}>
+                  <CardHeader>
+                    {f.name} <Badge variant={f.source === "uploaded" ? "info" : "default"}>{f.source}</Badge>
+                  </CardHeader>
+                  <CardBody>
+                    <pre className={styles.preview}>{f.content}</pre>
+                  </CardBody>
+                </Card>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Seed PRD section — shown inline below locked foundations */}
+        {needsSeedPRD && (
+          <div style={{ borderTop: "1px solid var(--color-border, #e7e5e4)", paddingTop: "var(--space-6, 1.5rem)" }}>
+            <Suspense fallback={<LoadingState message="Loading PRD intake..." />}>
+              <SeedPRDIntake />
+            </Suspense>
           </div>
         )}
-        <div className={styles.actions}>
-          <Link to={`/projects/${projectId}/prd-intake`}>
-            <Button>Enter Seed PRD</Button>
-          </Link>
-          <Link to={`/projects/${projectId}`}>
-            <Button variant="secondary">Go to Dashboard</Button>
-          </Link>
-        </div>
+
+        {pastSeedPRD && (
+          <div style={{ borderTop: "1px solid var(--color-border, #e7e5e4)", paddingTop: "var(--space-6, 1.5rem)" }}>
+            <Badge variant="success">Seed PRD Submitted</Badge>
+            <p style={{ marginTop: "var(--space-2, 0.5rem)", color: "var(--color-text-secondary, #57534e)" }}>
+              Your seed PRD has been submitted. The planning workflow is ready to begin.
+            </p>
+            <div className={styles.actions}>
+              <Link to={`/projects/${projectId}`}>
+                <Button>Go to Dashboard</Button>
+              </Link>
+            </div>
+          </div>
+        )}
       </div>
     );
   }

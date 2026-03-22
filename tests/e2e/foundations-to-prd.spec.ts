@@ -77,7 +77,7 @@ test.describe('Foundations to PRD intake flow', () => {
     }
 
     // Verify locked state shows files.
-    await expect(page.getByText('Locked', { exact: true })).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText('Foundations Locked')).toBeVisible({ timeout: 5000 });
 
     // Files should be visible in the locked view.
     await expect(page.getByText('AGENTS.md').first()).toBeVisible({ timeout: 5000 });
@@ -111,7 +111,7 @@ test.describe('Foundations to PRD intake flow', () => {
     await expect(page.getByText('AGENTS.md').first()).toBeVisible({ timeout: 5000 });
   });
 
-  test('locked foundations view links to PRD intake', async ({ page, request }) => {
+  test('locked foundations show inline seed PRD section', async ({ page, request }) => {
     // Ensure locked.
     await request.post(`/api/projects/${projectId}/foundations/lock`, {
       data: {},
@@ -119,13 +119,9 @@ test.describe('Foundations to PRD intake flow', () => {
 
     await page.goto(`/projects/${projectId}/foundations`);
 
-    // Should see a link/button to enter the seed PRD.
-    const prdLink = page.getByRole('link', { name: /Seed PRD|Enter.*PRD/i });
-    await expect(prdLink).toBeVisible({ timeout: 5000 });
-
-    // Click and verify navigation.
-    await prdLink.click();
-    await expect(page).toHaveURL(/\/prd-intake/, { timeout: 5000 });
+    // Seed PRD section should appear inline below locked foundations (not on a separate page).
+    await expect(page.getByRole('heading', { name: /Seed PRD/i })).toBeVisible({ timeout: 5000 });
+    await expect(page.getByLabel(/paste.*PRD/i)).toBeVisible();
   });
 
   test('PRD intake page renders with paste textarea', async ({ page }) => {

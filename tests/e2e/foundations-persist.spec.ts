@@ -1,7 +1,6 @@
 /**
- * Regression test: Foundations must persist after locking.
- * Reproduces the user-reported bug where files disappear after clicking
- * "Lock Foundations & Proceed".
+ * Regression test: Foundations must persist after locking, and
+ * the seed PRD textarea must appear inline below the locked foundations.
  */
 import { test, expect } from '@playwright/test';
 import { APIHelper } from './helpers/api';
@@ -11,10 +10,8 @@ test.describe('Foundations persistence', () => {
     const api = new APIHelper(request);
     const name = `Persist Test ${Date.now()}`;
 
-    // Create project via API.
     const project = await api.createProject(name);
 
-    // Navigate to foundations page.
     await page.goto(`/projects/${project.id}/foundations`);
     await expect(page.getByRole('alert')).not.toBeVisible();
 
@@ -25,59 +22,52 @@ test.describe('Foundations persistence', () => {
 
     // Save & Preview.
     await page.getByRole('button', { name: /Save/i }).click();
-
-    // Wait for preview to appear — use CardHeader text which is unique per file.
     await expect(page.getByRole('button', { name: /Lock/i })).toBeVisible({ timeout: 5000 });
 
     // Lock foundations.
     await page.getByRole('button', { name: /Lock/i }).click();
 
-    // === KEY ASSERTION: Locked badge visible ===
-    await expect(page.getByText('Locked', { exact: true })).toBeVisible({ timeout: 5000 });
+    // Locked badge visible.
+    await expect(page.getByText('Foundations Locked')).toBeVisible({ timeout: 5000 });
 
-    // === KEY ASSERTION: Files must STILL be visible after locking ===
-    // Check for the file content (unique per file, avoids strict mode issues)
+    // Files still visible after locking.
     await expect(page.getByText('TECH_STACK.md').first()).toBeVisible();
     await expect(page.getByText('ARCHITECTURE.md').first()).toBeVisible();
 
+    // Seed PRD textarea appears inline (not a separate page).
+    await expect(page.getByLabel(/Paste your PRD/i)).toBeVisible();
+
     // Navigate away and come back — files must persist.
-    await page.goto(`/projects/${project.id}`); // dashboard
+    await page.goto(`/projects/${project.id}`);
     await page.goto(`/projects/${project.id}/foundations`);
 
-    // Files still visible after reload.
-    await expect(page.getByText('Locked', { exact: true })).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText('Foundations Locked')).toBeVisible({ timeout: 5000 });
     await expect(page.getByText('TECH_STACK.md').first()).toBeVisible();
   });
 
-  test('locked foundations show Enter Seed PRD link', async ({ page, request }) => {
+  test('locked foundations show inline seed PRD textarea', async ({ page, request }) => {
     const api = new APIHelper(request);
-    const name = `PRD Entry Test ${Date.now()}`;
+    const name = `PRD Inline Test ${Date.now()}`;
 
-    // Create project, submit foundations, lock — all via API.
     const project = await api.createProject(name);
     await api.submitFoundations(project.id, {
       project_name: name,
       tech_stack: ['Go'],
       architecture_direction: 'Mono',
     });
-
-    // Lock via API.
     await request.post(`/api/projects/${project.id}/foundations/lock`, { data: {} });
 
-    // Navigate to foundations page.
     await page.goto(`/projects/${project.id}/foundations`);
     await expect(page.getByRole('alert')).not.toBeVisible();
 
-    // Should show locked state.
-    await expect(page.getByText('Locked', { exact: true })).toBeVisible({ timeout: 5000 });
+    // Locked state visible.
+    await expect(page.getByText('Foundations Locked')).toBeVisible({ timeout: 5000 });
 
-    // Should show foundation files.
+    // Foundation files visible.
     await expect(page.getByText('AGENTS.md').first()).toBeVisible();
 
-    // Should show Enter Seed PRD link.
-    await expect(page.getByRole('link', { name: /Enter Seed PRD/i })).toBeVisible();
-
-    // Should show Go to Dashboard link.
-    await expect(page.getByRole('link', { name: /Go to Dashboard/i })).toBeVisible();
+    // Seed PRD section appears inline below foundations.
+    await expect(page.getByRole('heading', { name: 'Seed PRD', exact: true })).toBeVisible();
+    await expect(page.getByLabel(/Paste your PRD/i)).toBeVisible();
   });
 });
