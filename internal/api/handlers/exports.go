@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"database/sql"
 	"fmt"
 	"io"
 	"log/slog"
@@ -15,13 +16,14 @@ import (
 
 // ExportHandler handles export-related API endpoints.
 type ExportHandler struct {
+	db      *sql.DB
 	dataDir string
 	logger  *slog.Logger
 }
 
 // NewExportHandler creates a new export handler.
-func NewExportHandler(dataDir string, logger *slog.Logger) *ExportHandler {
-	return &ExportHandler{dataDir: dataDir, logger: logger}
+func NewExportHandler(db *sql.DB, dataDir string, logger *slog.Logger) *ExportHandler {
+	return &ExportHandler{db: db, dataDir: dataDir, logger: logger}
 }
 
 // Routes registers export routes on the given router.
@@ -30,15 +32,44 @@ func (h *ExportHandler) Routes(r chi.Router) {
 	r.Get("/exports/{exportId}/download", h.downloadExport)
 }
 
+// exportResponse is the API representation of an export record.
+type exportResponse struct {
+	ID                   string `json:"id"`
+	ProjectID            string `json:"project_id"`
+	BundlePath           string `json:"bundle_path"`
+	IncludeIntermediates bool   `json:"include_intermediates"`
+	ManifestPath         string `json:"manifest_path"`
+	CreatedAt            string `json:"created_at"`
+	// Computed fields.
+	FileSize int64  `json:"file_size"`
+	Status   string `json:"status"`
+}
+
 // getExport returns metadata for an export bundle.
 func (h *ExportHandler) getExport(w http.ResponseWriter, r *http.Request) {
 	exportID := chi.URLParam(r, "exportId")
 
-	// TODO: Query the exports table for real metadata.
-	response.JSON(w, http.StatusOK, map[string]any{
-		"id":     exportID,
-		"status": "complete",
-	})
+	var exp exportResponse
+	var includeInter int
+	err := h.db.QueryRowContext(r.Context(),
+		`SELECT id, project_id, bundle_path, include_intermediates, manifest_path, created_at
+		 FROM exports WHERE id = ?`, exportID).
+		Scan(&exp.ID, &exp.ProjectID, &exp.BundlePath, &includeInter, &exp.ManifestPath, &exp.CreatedAt)
+	if err != nil {
+		response.NotFound(w, "export not found")
+		return
+	}
+	exp.IncludeIntermediates = includeInter == 1
+
+	// Check if the bundle file exists and get its size.
+	if info, err := os.Stat(exp.BundlePath); err == nil {
+		exp.FileSize = info.Size()
+		exp.Status = "complete"
+	} else {
+		exp.Status = "missing"
+	}
+
+	response.JSON(w, http.StatusOK, exp)
 }
 
 // downloadExport serves the export bundle zip file.
@@ -71,7 +102,6 @@ func (h *ExportHandler) downloadExport(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/zip")
 	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s.zip"`, sanitized))
 	if _, err := io.Copy(w, file); err != nil {
-		// Headers already sent — log the error but can't change HTTP status.
 		h.logger.Error("streaming export file", "error", err, "export_id", sanitized)
 	}
 }
