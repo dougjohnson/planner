@@ -376,6 +376,50 @@ Test behavior, not implementation trivia.
 	•	Keep tests deterministic and readable.
 	•	Every bug fix should consider whether a regression test is warranted.
 
+15.4 Test-friendly markup with `data-testid`
+
+Use `data-testid` as a **last resort** for test targeting — prefer accessible locators first.
+
+Locator priority (applies to both component tests and Playwright E2E tests):
+	1.	`getByRole` — best; matches what assistive technology sees
+	2.	`getByLabel` — for form inputs with labels
+	3.	`getByText` — for visible content
+	4.	`getByTestId` — last resort, for elements with no accessible name
+
+When to add `data-testid`:
+	•	The element has no accessible role, label, or visible text (e.g., a decorative container that wraps a drag target)
+	•	Multiple identical elements exist and you need to distinguish them beyond `.first()` / `.nth()`
+	•	The element's visible text is dynamic or localized, making text-based locators fragile
+
+When NOT to add `data-testid`:
+	•	The element already has a role and accessible name (`<button>Submit</button>` → use `getByRole('button', { name: /Submit/ })`)
+	•	The element has a label (`<label htmlFor="email">Email</label>` → use `getByLabel('Email')`)
+	•	You're adding it just to avoid writing a slightly more complex locator
+
+Rules:
+	•	Use descriptive, kebab-case names: `data-testid="project-card-actions"`, not `data-testid="div1"`
+	•	Scope to the component: `data-testid="review-item-accept-btn"`, not `data-testid="btn"`
+	•	Never use `data-testid` for styling or application logic — it exists only for tests
+	•	Consider stripping `data-testid` attributes in production builds if bundle size is a concern (Vite plugin or Babel transform)
+
+Example:
+
+```tsx
+{/* No testid needed — accessible role + name is sufficient */}
+<button onClick={onSave}>Save Changes</button>
+
+{/* testid needed — icon-only button with no visible text */}
+<button onClick={onClose} aria-label="Close" data-testid="modal-close-btn">
+  <CloseIcon />
+</button>
+
+{/* testid needed — distinguishing multiple similar cards */}
+<div data-testid={`stage-card-${stage.id}`}>
+  <StatusChip status={stage.status} />
+  <span>{stage.name}</span>
+</div>
+```
+
 16. TypeScript standards
 	•	Use strict mode.
 	•	Prefer precise types over any.
