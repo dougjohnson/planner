@@ -9,6 +9,7 @@ import (
 	"syscall"
 
 	"github.com/dougflynn/flywheel-planner/internal/api"
+	"github.com/dougflynn/flywheel-planner/internal/api/handlers"
 	"github.com/dougflynn/flywheel-planner/internal/app"
 	"github.com/dougflynn/flywheel-planner/internal/db"
 	"github.com/dougflynn/flywheel-planner/internal/logging"
@@ -53,13 +54,19 @@ func run(ctx context.Context, cfg *app.Config, logger *slog.Logger) error {
 	}
 	defer database.Close()
 
-	// TODO: Bootstrap all services (migrations, repos, handlers) once
-	// app.Bootstrap is implemented. For now, the server starts with
-	// health endpoint only.
-	_ = database // will be passed to services once they exist
+	// Bootstrap all services: migrations, repos, prompt seeding, crash recovery.
+	services, err := app.Bootstrap(ctx, cfg, database, logger)
+	if err != nil {
+		return fmt.Errorf("bootstrap: %w", err)
+	}
 
-	// Build HTTP server and mount routes.
+	// Build HTTP server and mount all route groups.
 	srv := api.NewServer(cfg.ListenAddr, logger)
+	srv.MountProjectRoutes(services.ProjectHandler)
+	srv.MountWorkflowRoutes(services.WorkflowHandler)
+	srv.MountSSE(services.SSEHub)
+	srv.MountModelRoutes(handlers.NewModelHandler(services.DB, logger))
+	srv.MountPromptRoutes(handlers.NewPromptHandler(services.DB, logger))
 
 	// Embed frontend SPA assets.
 	srv.RegisterSPA(frontendDistFS())

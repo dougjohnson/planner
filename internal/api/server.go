@@ -124,6 +124,18 @@ func (s *Server) MountWorkflowRoutes(h *handlers.WorkflowHandler) {
 	s.router.Route("/api/projects/{projectId}/workflow", h.Routes)
 }
 
+// MountModelRoutes registers model config routes under /api/models.
+func (s *Server) MountModelRoutes(h *handlers.ModelHandler) {
+	s.router.Route("/api/models", h.Routes)
+}
+
+// MountPromptRoutes registers prompt inspection routes under /api/prompts
+// and prompt render routes under /api/workflow-runs.
+func (s *Server) MountPromptRoutes(h *handlers.PromptHandler) {
+	s.router.Route("/api/prompts", h.Routes)
+	s.router.Route("/api/workflow-runs", h.RunPromptRoutes)
+}
+
 // MountSSE registers the SSE endpoint for real-time events.
 func (s *Server) MountSSE(hub *sse.Hub) {
 	s.router.Get("/api/projects/{projectId}/events", func(w http.ResponseWriter, r *http.Request) {
