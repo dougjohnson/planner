@@ -196,7 +196,7 @@ func guardLoopExhausted(ctx context.Context, db *sql.DB, projectID string) Guard
 	// Count completed review iterations and compare to configured max.
 	var maxIter int
 	err := db.QueryRowContext(ctx, `
-		SELECT COALESCE(max_iterations, 4) FROM loop_configs
+		SELECT COALESCE(iteration_count, 4) FROM loop_configs
 		WHERE project_id = ? ORDER BY created_at DESC LIMIT 1
 	`, projectID).Scan(&maxIter)
 	if err != nil {
