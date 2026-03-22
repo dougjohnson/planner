@@ -259,6 +259,10 @@ func (h *WorkflowHandler) StartStage(w http.ResponseWriter, r *http.Request) {
 						Stage: stage, RunID: runID,
 					})
 				}
+
+				// Auto-advance chain: keep advancing through stages that have
+				// registered handlers until we hit a user-action stage.
+				h.autoAdvanceChain(ctx, projectID, stage)
 			}
 		}()
 	}
@@ -362,6 +366,63 @@ func (h *WorkflowHandler) Configure(w http.ResponseWriter, r *http.Request) {
 		"project_id": projectID,
 		"status":     "configured",
 	})
+}
+
+// autoAdvanceChain runs successive stages until hitting one without a handler
+// (user-action stages) or encountering an error. This enables Stage 3→4→5
+// to execute as a continuous chain from a single StartStage call.
+func (h *WorkflowHandler) autoAdvanceChain(ctx context.Context, projectID, completedStage string) {
+	prevStage := completedStage
+	for {
+		var nextStage string
+		h.db.QueryRowContext(ctx,
+			`SELECT current_stage FROM projects WHERE id = ?`, projectID,
+		).Scan(&nextStage)
+
+		if nextStage == "" || nextStage == prevStage || !h.dispatcher.HasHandler(nextStage) {
+			break
+		}
+
+		h.logger.Info("auto-advancing to next stage",
+			"from", prevStage, "to", nextStage, "project_id", projectID)
+
+		nextRunID := uuid.NewString()
+		nextNow := time.Now().UTC().Format(time.RFC3339)
+		h.db.ExecContext(ctx,
+			`INSERT INTO workflow_runs (id, project_id, stage, status, attempt, created_at)
+			 VALUES (?, ?, ?, 'running', 1, ?)`,
+			nextRunID, projectID, nextStage, nextNow)
+
+		if h.eventPublisher != nil {
+			h.eventPublisher.Publish(ctx, projectID, events.StageStarted, nextRunID, events.Payload{
+				Stage: nextStage, RunID: nextRunID, Message: "Auto-advanced",
+			})
+		}
+
+		if err := h.dispatcher.Dispatch(ctx, nextStage, projectID, nextRunID); err != nil {
+			h.logger.Error("auto-advanced stage failed", "stage", nextStage, "error", err)
+			h.db.ExecContext(ctx,
+				`UPDATE workflow_runs SET status = 'failed', error_message = ?, completed_at = ? WHERE id = ?`,
+				err.Error(), time.Now().UTC().Format(time.RFC3339), nextRunID)
+			if h.eventPublisher != nil {
+				h.eventPublisher.Publish(ctx, projectID, events.StageFailed, nextRunID, events.Payload{
+					Stage: nextStage, RunID: nextRunID, Error: err.Error(),
+				})
+			}
+			break
+		}
+
+		h.db.ExecContext(ctx,
+			`UPDATE workflow_runs SET status = 'completed', completed_at = ? WHERE id = ?`,
+			time.Now().UTC().Format(time.RFC3339), nextRunID)
+		if h.eventPublisher != nil {
+			h.eventPublisher.Publish(ctx, projectID, events.StageCompleted, nextRunID, events.Payload{
+				Stage: nextStage, RunID: nextRunID,
+			})
+		}
+
+		prevStage = nextStage
+	}
 }
 
 // isValidStage checks if a stage ID exists in the stage definitions.

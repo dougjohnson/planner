@@ -162,6 +162,52 @@ func Bootstrap(ctx context.Context, cfg *Config, db *sql.DB, logger *slog.Logger
 		},
 	))
 
+	// Register Stage 4 handler (PRD synthesis — GPT).
+	dispatcher.Register("prd_synthesis", engine.StageHandlerFunc(
+		func(ctx context.Context, projectID, _ string) error {
+			gptProvider := providerRegistry.Get(models.ProviderOpenAI)
+			if gptProvider == nil {
+				return fmt.Errorf("GPT provider not registered")
+			}
+			result, err := stages.ExecuteSynthesis(ctx, db, gptProvider,
+				stages.PRDSynthesisConfig(), projectID, "", logger)
+			if err != nil {
+				return err
+			}
+			logger.Info("stage 4 complete", "artifact_id", result.ArtifactID)
+			// Advance to integration.
+			db.ExecContext(ctx,
+				`UPDATE projects SET current_stage = 'prd_integration' WHERE id = ?`, projectID)
+			return nil
+		},
+	))
+
+	// Register Stage 5 handler (PRD integration — Opus).
+	dispatcher.Register("prd_integration", engine.StageHandlerFunc(
+		func(ctx context.Context, projectID, _ string) error {
+			opusProvider := providerRegistry.Get(models.ProviderAnthropic)
+			if opusProvider == nil {
+				return fmt.Errorf("Opus provider not registered")
+			}
+			result, err := stages.ExecuteIntegration(ctx, db, opusProvider,
+				stages.PRDIntegrationConfig(), projectID, "", logger)
+			if err != nil {
+				return err
+			}
+			logger.Info("stage 5 complete",
+				"artifact_id", result.ArtifactID,
+				"disagreements", result.DisagreementCount)
+			// Advance based on disagreements.
+			nextStage := "prd_review" // Stage 7 — skip Stage 6 if no disagreements
+			if result.HasDisagreements {
+				nextStage = "prd_disagreement_review" // Stage 6 — user review
+			}
+			db.ExecContext(ctx,
+				`UPDATE projects SET current_stage = ? WHERE id = ?`, nextStage, projectID)
+			return nil
+		},
+	))
+
 	// Step 14: Build API handlers.
 	projectHandler := handlers.NewProjectHandler(projectRepo, logger)
 	workflowHandler := handlers.NewWorkflowHandler(db, eventPublisher, logger)
