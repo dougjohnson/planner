@@ -1,25 +1,27 @@
 package handlers
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
 
+	"github.com/dougflynn/flywheel-planner/internal/api/response"
 	"github.com/go-chi/chi/v5"
 )
 
 // ExportHandler handles export-related API endpoints.
 type ExportHandler struct {
 	dataDir string
+	logger  *slog.Logger
 }
 
 // NewExportHandler creates a new export handler.
-func NewExportHandler(dataDir string) *ExportHandler {
-	return &ExportHandler{dataDir: dataDir}
+func NewExportHandler(dataDir string, logger *slog.Logger) *ExportHandler {
+	return &ExportHandler{dataDir: dataDir, logger: logger}
 }
 
 // Routes registers export routes on the given router.
@@ -32,13 +34,10 @@ func (h *ExportHandler) Routes(r chi.Router) {
 func (h *ExportHandler) getExport(w http.ResponseWriter, r *http.Request) {
 	exportID := chi.URLParam(r, "exportId")
 
-	// Query the exports table for metadata.
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]any{
-		"data": map[string]any{
-			"id":     exportID,
-			"status": "complete",
-		},
+	// TODO: Query the exports table for real metadata.
+	response.JSON(w, http.StatusOK, map[string]any{
+		"id":     exportID,
+		"status": "complete",
 	})
 }
 
@@ -49,7 +48,7 @@ func (h *ExportHandler) downloadExport(w http.ResponseWriter, r *http.Request) {
 	// Sanitize exportID to prevent path traversal (§15.2).
 	sanitized := filepath.Base(exportID)
 	if sanitized == "." || sanitized == "/" || strings.Contains(sanitized, "..") {
-		http.Error(w, `{"error":{"code":"bad_request","message":"invalid export ID"}}`, http.StatusBadRequest)
+		response.BadRequest(w, "invalid export ID")
 		return
 	}
 
@@ -58,25 +57,21 @@ func (h *ExportHandler) downloadExport(w http.ResponseWriter, r *http.Request) {
 	// Verify the resolved path stays within the data directory.
 	absPath, err := filepath.Abs(bundlePath)
 	if err != nil || !strings.HasPrefix(absPath, h.dataDir) {
-		http.Error(w, `{"error":{"code":"bad_request","message":"invalid export path"}}`, http.StatusBadRequest)
+		response.BadRequest(w, "invalid export path")
 		return
 	}
 
 	file, err := os.Open(absPath)
 	if err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusNotFound)
-		json.NewEncoder(w).Encode(map[string]any{
-			"error": map[string]any{
-				"code":    "not_found",
-				"message": "export bundle not found",
-			},
-		})
+		response.NotFound(w, "export bundle not found")
 		return
 	}
 	defer file.Close()
 
 	w.Header().Set("Content-Type", "application/zip")
 	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s.zip"`, sanitized))
-	io.Copy(w, file)
+	if _, err := io.Copy(w, file); err != nil {
+		// Headers already sent — log the error but can't change HTTP status.
+		h.logger.Error("streaming export file", "error", err, "export_id", sanitized)
+	}
 }

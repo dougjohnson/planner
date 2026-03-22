@@ -256,9 +256,13 @@ func (h *ModelHandler) ValidateModel(w http.ResponseWriter, r *http.Request) {
 
 	// For now, mark as validated. Real validation would use the provider adapter.
 	now := time.Now().UTC().Format(time.RFC3339Nano)
-	h.db.ExecContext(r.Context(),
+	if _, err := h.db.ExecContext(r.Context(),
 		`UPDATE model_configs SET validation_status = 'valid', updated_at = ? WHERE id = ?`,
-		now, modelID)
+		now, modelID); err != nil {
+		h.logger.Error("updating validation status", "error", err, "model_id", modelID)
+		response.InternalError(w, "failed to update validation status")
+		return
+	}
 
 	response.JSON(w, http.StatusOK, map[string]any{
 		"model_id":          modelID,

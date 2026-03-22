@@ -74,12 +74,21 @@ func (h *ArtifactHandler) ListByProject(w http.ResponseWriter, r *http.Request) 
 		var canonical int
 		if err := rows.Scan(&a.ID, &a.ProjectID, &a.ArtifactType, &a.VersionLabel, &a.SourceStage, &a.SourceModel, &canonical, &a.CreatedAt); err != nil {
 			h.logger.Error("scanning artifact", "error", err)
-			continue
+			response.InternalError(w, "failed to read artifacts")
+			return
 		}
 		a.IsCanonical = canonical == 1
 		artifacts = append(artifacts, a)
 	}
+	if err := rows.Err(); err != nil {
+		h.logger.Error("iterating artifacts", "error", err)
+		response.InternalError(w, "failed to read artifacts")
+		return
+	}
 
+	if artifacts == nil {
+		artifacts = []artifactSummary{}
+	}
 	response.JSON(w, http.StatusOK, artifacts)
 }
 
@@ -163,11 +172,21 @@ func (h *ArtifactHandler) GetFragments(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var fd fragmentDetail
 		if err := rows.Scan(&fd.FragmentID, &fd.FragmentVersionID, &fd.Heading, &fd.Depth, &fd.Content, &fd.Checksum, &fd.Position); err != nil {
-			continue
+			h.logger.Error("scanning fragment", "error", err)
+			response.InternalError(w, "failed to read artifact fragments")
+			return
 		}
 		frags = append(frags, fd)
 	}
+	if err := rows.Err(); err != nil {
+		h.logger.Error("iterating fragments", "error", err)
+		response.InternalError(w, "failed to read artifact fragments")
+		return
+	}
 
+	if frags == nil {
+		frags = []fragmentDetail{}
+	}
 	response.JSON(w, http.StatusOK, frags)
 }
 

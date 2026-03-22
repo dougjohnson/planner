@@ -238,13 +238,27 @@ func scanRun(row *sql.Row) (*Run, error) {
 	if modelConfigID.Valid {
 		run.ModelConfigID = modelConfigID.String
 	}
-	run.CreatedAt, _ = time.Parse(time.RFC3339Nano, createdAt)
+	parsedCreatedAt, err := time.Parse(time.RFC3339Nano, createdAt)
+	if err != nil {
+		// Fall back to RFC3339 (without nanoseconds) which is what most code writes.
+		parsedCreatedAt, err = time.Parse(time.RFC3339, createdAt)
+		if err != nil {
+			return nil, fmt.Errorf("parsing created_at %q: %w", createdAt, err)
+		}
+	}
+	run.CreatedAt = parsedCreatedAt
 	if startedAt.Valid {
-		t, _ := time.Parse(time.RFC3339Nano, startedAt.String)
+		t, err := time.Parse(time.RFC3339Nano, startedAt.String)
+		if err != nil {
+			t, _ = time.Parse(time.RFC3339, startedAt.String)
+		}
 		run.StartedAt = &t
 	}
 	if completedAt.Valid {
-		t, _ := time.Parse(time.RFC3339Nano, completedAt.String)
+		t, err := time.Parse(time.RFC3339Nano, completedAt.String)
+		if err != nil {
+			t, _ = time.Parse(time.RFC3339, completedAt.String)
+		}
 		run.CompletedAt = &t
 	}
 	return &run, nil
@@ -271,13 +285,23 @@ func scanRunFromRows(rows *sql.Rows) (*Run, error) {
 	if modelConfigID.Valid {
 		run.ModelConfigID = modelConfigID.String
 	}
-	run.CreatedAt, _ = time.Parse(time.RFC3339Nano, createdAt)
+	parsedCreatedAt, err := time.Parse(time.RFC3339Nano, createdAt)
+	if err != nil {
+		parsedCreatedAt, _ = time.Parse(time.RFC3339, createdAt)
+	}
+	run.CreatedAt = parsedCreatedAt
 	if startedAt.Valid {
-		t, _ := time.Parse(time.RFC3339Nano, startedAt.String)
+		t, err := time.Parse(time.RFC3339Nano, startedAt.String)
+		if err != nil {
+			t, _ = time.Parse(time.RFC3339, startedAt.String)
+		}
 		run.StartedAt = &t
 	}
 	if completedAt.Valid {
-		t, _ := time.Parse(time.RFC3339Nano, completedAt.String)
+		t, err := time.Parse(time.RFC3339Nano, completedAt.String)
+		if err != nil {
+			t, _ = time.Parse(time.RFC3339, completedAt.String)
+		}
 		run.CompletedAt = &t
 	}
 	return &run, nil
