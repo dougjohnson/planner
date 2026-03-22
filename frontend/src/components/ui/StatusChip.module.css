@@ -1,0 +1,46 @@
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.1875rem 0.625rem;
+  border-radius: var(--radius-full);
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+.dot {
+  width: 0.375rem;
+  height: 0.375rem;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* Pulsing animation for running state */
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.pending { background: var(--color-bg-subtle); color: var(--color-text-muted); }
+.pending .dot { background: #a8a29e; }
+
+.running { background: #eff6ff; color: #1d4ed8; }
+.running .dot { background: #3b82f6; animation: pulse 1.5s ease-in-out infinite; }
+
+.completed { background: var(--color-success-light); color: #15803d; }
+.completed .dot { background: var(--color-success); }
+
+.failed { background: var(--color-error-light); color: #dc2626; }
+.failed .dot { background: var(--color-error); }
+
+.blocked { background: var(--color-warning-light); color: #a16207; }
+.blocked .dot { background: var(--color-warning); }
+
+.cancelled { background: var(--color-bg-subtle); color: var(--color-text-muted); }
+.cancelled .dot { background: #a8a29e; }
+
+.interrupted { background: #fff7ed; color: #c2410c; }
+.interrupted .dot { background: #f97316; }
