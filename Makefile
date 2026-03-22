@@ -6,12 +6,14 @@ BUILD_DIR := build
 FRONTEND_DIR := frontend
 FRONTEND_DIST := $(FRONTEND_DIR)/dist
 GO_MODULE := github.com/dougflynn/flywheel-planner
+REPORT_DIR := test-reports
 
 # Build flags.
 VERSION ?= dev
 LDFLAGS := -ldflags "-s -w -X main.version=$(VERSION)"
 
-.PHONY: all clean build frontend backend test lint vet check
+.PHONY: all clean build frontend backend test test-unit test-race test-coverage \
+	test-frontend test-e2e test-all lint vet check fmt dev verify
 
 # Default: full production build.
 all: build
@@ -33,38 +35,80 @@ backend:
 	go build $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME) ./cmd/flywheel-planner
 	@echo "Binary: $(BUILD_DIR)/$(BINARY_NAME)"
 
-# Run all tests.
-test: test-backend test-frontend
+# --- Test targets ---
 
-test-backend:
-	go test ./... -race
+# Quick unit tests (no race detector).
+test-unit:
+	@echo "=== Backend unit tests ==="
+	go test ./internal/... -count=1
+	@echo "PASS: Backend unit tests"
 
+# Unit tests with race detector.
+test-race:
+	@echo "=== Backend unit tests (race) ==="
+	go test ./internal/... -race -count=1
+	@echo "PASS: Backend unit tests with race detector"
+
+# Coverage report.
+test-coverage:
+	@echo "=== Backend coverage ==="
+	@mkdir -p $(REPORT_DIR)
+	go test ./internal/... -coverprofile=$(REPORT_DIR)/coverage.out -count=1
+	go tool cover -html=$(REPORT_DIR)/coverage.out -o $(REPORT_DIR)/coverage.html
+	go tool cover -func=$(REPORT_DIR)/coverage.out | tail -1
+	@echo "Coverage report: $(REPORT_DIR)/coverage.html"
+
+# Frontend tests.
 test-frontend:
-	cd $(FRONTEND_DIR) && npm test
+	@echo "=== Frontend tests ==="
+	cd $(FRONTEND_DIR) && npx vitest run
+	@echo "PASS: Frontend tests"
 
-# Lint and static analysis.
+# E2E tests (requires built binary, starts server).
+test-e2e:
+	@echo "=== E2E tests ==="
+	./scripts/run-e2e.sh
+	@echo "PASS: E2E tests"
+
+# All tests sequentially: unit → frontend → e2e.
+test-all: test-unit test-frontend test-e2e
+	@echo "All tests passed."
+
+# Quick alias.
+test: test-unit test-frontend
+
+# --- Lint and static analysis ---
+
 lint: vet
 	cd $(FRONTEND_DIR) && npm run lint
 
 vet:
-	go vet ./...
+	go vet ./internal/...
 
-# Type checking.
+# Type checking (both Go and TypeScript).
 check:
 	cd $(FRONTEND_DIR) && npm run typecheck
-	go build ./...
+	go build ./internal/...
 
 # Format.
 fmt:
 	gofmt -w .
 	cd $(FRONTEND_DIR) && npx prettier --write .
 
-# Clean build artifacts.
+# Format check (CI mode — fails on unformatted code).
+fmt-check:
+	@test -z "$$(gofmt -l .)" || (echo "Go files not formatted:" && gofmt -l . && exit 1)
+	cd $(FRONTEND_DIR) && npx prettier --check .
+
+# --- Clean ---
+
 clean:
 	rm -rf $(BUILD_DIR)
 	rm -rf $(FRONTEND_DIST)
+	rm -rf $(REPORT_DIR)
 
-# Development: run backend with hot reload frontend proxy.
+# --- Development ---
+
 dev:
 	@echo "Start frontend dev server: cd frontend && npm run dev"
 	@echo "Start backend: go run ./cmd/flywheel-planner"

@@ -8,9 +8,12 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   workers: process.env.CI ? 1 : undefined,
   reporter: [
-    ['html', { outputFolder: 'playwright-report' }],
-    ['list'],
+    ['html', { outputFolder: 'playwright-report', open: 'never' }],
+    ['json', { outputFile: 'test-results/results.json' }],
+    ['junit', { outputFile: 'test-results/junit.xml' }],
+    process.env.CI ? ['dot'] : ['list'],
   ],
+  outputDir: 'test-results/artifacts',
   use: {
     baseURL: process.env.BASE_URL || 'http://127.0.0.1:7432',
     trace: 'on-first-retry',
