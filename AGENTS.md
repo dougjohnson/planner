@@ -283,6 +283,35 @@ npx vitest run src/features/auth/LoginForm.test.tsx
 - Every bug fix should consider whether a regression test is warranted
 - Test loading, error, and empty states for async UI
 
+### Playwright E2E Tests
+
+Follow all practices in `PLAYWRIGHT_BEST_PRACTICES.md`. Playwright tests live in `tests/e2e/` and run against the real Go backend with `FLYWHEEL_MOCK_PROVIDERS=true`.
+
+```bash
+cd tests/e2e
+
+# Run all E2E tests (auto-starts the Go server)
+npx playwright test
+
+# Run a specific spec file
+npx playwright test first-use.spec.ts
+
+# Run with visible browser for debugging
+npx playwright test --headed
+
+# View the HTML report
+npx playwright show-report
+```
+
+**E2E testing rules:**
+- Use accessible locators (`getByRole`, `getByLabel`, `getByText`) — never CSS selectors tied to styling classes
+- Never assume an empty database — tests share state across runs
+- Use `APIHelper` for test setup; only drive the UI when the UI itself is what you're testing
+- Assert the absence of error states after every navigation (`getByRole('alert')` not visible)
+- Never use `waitForTimeout` — rely on Playwright's auto-waiting with explicit timeout on assertions
+- Handle duplicate data from prior runs (use `.first()` or unique names with `Date.now()`)
+- Every user-visible bug fix should include a Playwright regression test
+
 ### Go Best Practices
 
 Follow all practices in `GOLANG_BEST_PRACTICES.md`. Key points:
