@@ -499,7 +499,7 @@ func TestAllMigrations_TotalTableCount(t *testing.T) {
 		t.Fatalf("counting tables: %v", err)
 	}
 
-	// All migrations 001-007 create 22 tables total:
+	// All migrations 001-008 create 23 tables total:
 	// 001: projects, project_inputs, model_configs, project_model_settings (4)
 	// 002: fragments, fragment_versions, document_streams, stream_heads (4)
 	// 003: artifacts, artifact_relations, artifact_fragments (3)
@@ -507,7 +507,8 @@ func TestAllMigrations_TotalTableCount(t *testing.T) {
 	// 005: review_items, review_decisions, guidance_injections (3)
 	// 006: prompt_templates, prompt_renders (2)
 	// 007: loop_configs, usage_records, credentials, exports (4)
-	expected := 22
+	// 008: idempotency_keys (1)
+	expected := 23
 	if count != expected {
 		t.Errorf("expected %d tables, got %d", expected, count)
 	}
