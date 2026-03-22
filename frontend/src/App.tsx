@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { createBrowserRouter, RouterProvider } from "react-router-dom";
+import { routes } from "./app/router/routes";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -10,23 +11,12 @@ const queryClient = new QueryClient({
   },
 });
 
+const router = createBrowserRouter(routes);
+
 export function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Home />} />
-        </Routes>
-      </BrowserRouter>
+      <RouterProvider router={router} />
     </QueryClientProvider>
-  );
-}
-
-function Home() {
-  return (
-    <main>
-      <h1>Flywheel Planner</h1>
-      <p>Planning workbench initializing...</p>
-    </main>
   );
 }
