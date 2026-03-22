@@ -48,7 +48,7 @@ test.describe('Foundations to PRD intake flow', () => {
       await saveButton.click();
 
       // Verify generated files appear.
-      await expect(page.getByText('AGENTS.md')).toBeVisible({ timeout: 5000 });
+      await expect(page.getByText('AGENTS.md').first()).toBeVisible({ timeout: 5000 });
     }
   });
 
@@ -77,10 +77,10 @@ test.describe('Foundations to PRD intake flow', () => {
     }
 
     // Verify locked state shows files.
-    await expect(page.getByText(/Locked/i)).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText('Locked', { exact: true })).toBeVisible({ timeout: 5000 });
 
     // Files should be visible in the locked view.
-    await expect(page.getByText('AGENTS.md')).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText('AGENTS.md').first()).toBeVisible({ timeout: 5000 });
   });
 
   test('foundations files persist after navigation away and back', async ({ page, request }) => {
@@ -98,7 +98,7 @@ test.describe('Foundations to PRD intake flow', () => {
 
     // Navigate to foundations.
     await page.goto(`/projects/${projectId}/foundations`);
-    await expect(page.getByText('AGENTS.md')).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText('AGENTS.md').first()).toBeVisible({ timeout: 5000 });
 
     // Navigate away.
     await page.goto(`/projects/${projectId}`);
@@ -108,7 +108,7 @@ test.describe('Foundations to PRD intake flow', () => {
     await page.goto(`/projects/${projectId}/foundations`);
 
     // Files should STILL be visible (loaded from backend, not React state).
-    await expect(page.getByText('AGENTS.md')).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText('AGENTS.md').first()).toBeVisible({ timeout: 5000 });
   });
 
   test('locked foundations view links to PRD intake', async ({ page, request }) => {
