@@ -29,6 +29,9 @@ node_modules/
 .venv/
 venv/
 
+# Go compiled binary
+flywheel-planner
+
 # Local AI agent settings
 .claude/settings.local.json
 
