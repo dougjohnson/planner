@@ -22,6 +22,9 @@ const ModelsConfig = lazy(() => import("../../features/models/ModelsConfig"));
 const PromptLibrary = lazy(
   () => import("../../features/prompts/PromptLibrary"),
 );
+const SeedPRDIntake = lazy(
+  () => import("../../features/prd/SeedPRDIntake"),
+);
 const Settings = lazy(() => import("../../features/settings/Settings"));
 const CreateProject = lazy(
   () => import("../../features/projects/CreateProject"),
@@ -102,6 +105,14 @@ export const routes: RouteObject[] = [
             element: (
               <LazyRoute>
                 <Foundations />
+              </LazyRoute>
+            ),
+          },
+          {
+            path: "prd-intake",
+            element: (
+              <LazyRoute>
+                <SeedPRDIntake />
               </LazyRoute>
             ),
           },

@@ -29,9 +29,10 @@ type Services struct {
 	Assembler       *rendering.Assembler
 	SSEHub          *sse.Hub
 	EventPublisher  *events.Publisher
-	ProjectHandler  *handlers.ProjectHandler
-	WorkflowHandler *handlers.WorkflowHandler
-	Logger          *slog.Logger
+	ProjectHandler      *handlers.ProjectHandler
+	WorkflowHandler     *handlers.WorkflowHandler
+	FoundationsHandler  *handlers.FoundationsHandler
+	Logger              *slog.Logger
 }
 
 // Bootstrap initializes all application services in the correct order per §6.5.
@@ -74,6 +75,7 @@ func Bootstrap(ctx context.Context, cfg *Config, db *sql.DB, logger *slog.Logger
 	// Step 14: Build API handlers.
 	projectHandler := handlers.NewProjectHandler(projectRepo, logger)
 	workflowHandler := handlers.NewWorkflowHandler(db, eventPublisher, logger)
+	foundationsHandler := handlers.NewFoundationsHandler(db, logger)
 
 	logger.Info("application bootstrap complete")
 
@@ -86,8 +88,9 @@ func Bootstrap(ctx context.Context, cfg *Config, db *sql.DB, logger *slog.Logger
 		Assembler:       assembler,
 		SSEHub:          sseHub,
 		EventPublisher:  eventPublisher,
-		ProjectHandler:  projectHandler,
-		WorkflowHandler: workflowHandler,
-		Logger:          logger,
+		ProjectHandler:     projectHandler,
+		WorkflowHandler:    workflowHandler,
+		FoundationsHandler: foundationsHandler,
+		Logger:             logger,
 	}, nil
 }

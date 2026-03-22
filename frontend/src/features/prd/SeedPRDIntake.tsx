@@ -6,6 +6,7 @@
  */
 
 import { useState, useCallback, type DragEvent, type ChangeEvent } from "react";
+import { useParams, Link } from "react-router-dom";
 
 /** Quality warning from the backend assessment. */
 interface QualityWarning {
@@ -27,7 +28,8 @@ type IntakeState = "empty" | "editing" | "preview" | "submitting" | "locked";
 const ALLOWED_EXTENSIONS = [".md", ".markdown", ".txt"];
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
 
-export default function SeedPRDIntake({ projectId }: { projectId: string }) {
+export default function SeedPRDIntake() {
+  const { projectId = "" } = useParams<{ projectId: string }>();
   const [state, setState] = useState<IntakeState>("empty");
   const [content, setContent] = useState("");
   const [filename, setFilename] = useState("");
@@ -163,7 +165,23 @@ export default function SeedPRDIntake({ projectId }: { projectId: string }) {
 
       {(state === "empty" || state === "editing" || state === "submitting") ? (
         <>
-          {/* Drop zone */}
+          {/* Paste area — primary input method */}
+          <div className="paste-area">
+            <label htmlFor="prd-content">Paste your PRD markdown:</label>
+            <textarea
+              id="prd-content"
+              value={content}
+              onChange={(e) => {
+                setContent(e.target.value);
+                setState("editing");
+              }}
+              rows={20}
+              placeholder={"# My Product Requirements Document\n\n## Overview\n\nDescribe your product here...\n\n## Goals\n\n## Requirements"}
+              autoFocus
+            />
+          </div>
+
+          {/* File upload — secondary input method */}
           <div
             className={`drop-zone ${isDragOver ? "drop-zone--active" : ""}`}
             onDrop={handleDrop}
@@ -173,7 +191,7 @@ export default function SeedPRDIntake({ projectId }: { projectId: string }) {
             tabIndex={0}
             aria-label="Drop a markdown file here or click to browse"
           >
-            <p>Drag and drop a markdown file here, or</p>
+            <p>Or drag and drop a markdown file here</p>
             <label className="file-input-label">
               Browse files
               <input
@@ -184,21 +202,6 @@ export default function SeedPRDIntake({ projectId }: { projectId: string }) {
               />
             </label>
             {filename && <p className="filename">Selected: {filename}</p>}
-          </div>
-
-          {/* Text area */}
-          <div className="paste-area">
-            <label htmlFor="prd-content">Or paste markdown directly:</label>
-            <textarea
-              id="prd-content"
-              value={content}
-              onChange={(e) => {
-                setContent(e.target.value);
-                setState("editing");
-              }}
-              rows={20}
-              placeholder="# My Product Requirements Document&#10;&#10;## Overview&#10;&#10;Describe your product here..."
-            />
           </div>
 
           <button
@@ -234,6 +237,9 @@ export default function SeedPRDIntake({ projectId }: { projectId: string }) {
       {state === "locked" && (
         <div className="intake-locked">
           <p>Seed PRD accepted. Ready to proceed to Stage 3 (PRD Generation).</p>
+          <Link to={`/projects/${projectId}`}>
+            <button className="submit-button">Go to Dashboard</button>
+          </Link>
         </div>
       )}
     </div>

@@ -136,6 +136,11 @@ func (s *Server) MountPromptRoutes(h *handlers.PromptHandler) {
 	s.router.Route("/api/workflow-runs", h.RunPromptRoutes)
 }
 
+// MountFoundationsRoutes registers foundations routes under /api/projects/{projectId}/foundations.
+func (s *Server) MountFoundationsRoutes(h *handlers.FoundationsHandler) {
+	s.router.Route("/api/projects/{projectId}/foundations", h.Routes)
+}
+
 // MountSSE registers the SSE endpoint for real-time events.
 func (s *Server) MountSSE(hub *sse.Hub) {
 	s.router.Get("/api/projects/{projectId}/events", func(w http.ResponseWriter, r *http.Request) {

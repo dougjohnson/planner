@@ -150,8 +150,11 @@ export default function Foundations() {
           </div>
         )}
         <div className={styles.actions}>
+          <Link to={`/projects/${projectId}/prd-intake`}>
+            <Button>Enter Seed PRD</Button>
+          </Link>
           <Link to={`/projects/${projectId}`}>
-            <Button>Go to Dashboard</Button>
+            <Button variant="secondary">Go to Dashboard</Button>
           </Link>
         </div>
       </div>
