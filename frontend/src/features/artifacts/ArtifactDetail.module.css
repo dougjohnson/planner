@@ -1,0 +1,115 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.title {
+  font-family: var(--font-serif);
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+.viewToggle {
+  display: flex;
+  gap: 0.375rem;
+}
+
+.markdown {
+  font-family: var(--font-serif);
+  line-height: 1.7;
+}
+
+.markdown h1,
+.markdown h2,
+.markdown h3 {
+  font-family: var(--font-serif);
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.markdown h2 {
+  font-size: 1.25rem;
+  border-bottom: 1px solid var(--color-border);
+  padding-bottom: 0.25rem;
+}
+
+.markdown p {
+  margin-bottom: 0.75rem;
+}
+
+.markdown ul,
+.markdown ol {
+  padding-left: 1.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.markdown code {
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  background: #f5f5f4;
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.25rem;
+}
+
+.markdown pre {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  background: #1c1917;
+  color: #fafaf9;
+  padding: 1rem;
+  border-radius: 0.5rem;
+  overflow-x: auto;
+  margin-bottom: 1rem;
+}
+
+.fragmentList {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.fragmentHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+.fragmentHeading {
+  font-weight: 600;
+}
+
+.fragmentMeta {
+  display: flex;
+  gap: 0.375rem;
+}
+
+.fragmentContent {
+  font-family: var(--font-serif);
+  line-height: 1.6;
+}
+
+.versionInfo {
+  display: flex;
+  gap: 1rem;
+  margin-top: 0.75rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--color-border);
+  font-size: 0.75rem;
+  color: #a8a29e;
+}
+
+.checksum {
+  font-family: var(--font-mono);
+}
+
+.timestamp {
+  font-family: var(--font-mono);
+}

@@ -1,0 +1,119 @@
+.container {
+  max-width: 48rem;
+}
+
+.heading {
+  font-family: var(--font-serif);
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+}
+
+.subtitle {
+  font-size: 0.875rem;
+  color: #78716c;
+  margin-bottom: 1.5rem;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.label {
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.input,
+.textarea {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: 0.375rem;
+  font-family: var(--font-sans);
+  font-size: 0.875rem;
+  background: #fff;
+}
+
+.input:focus,
+.textarea:focus {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -1px;
+}
+
+.textarea {
+  resize: vertical;
+}
+
+.dropZone {
+  border: 2px dashed var(--color-border);
+  border-radius: 0.5rem;
+  padding: 1.5rem;
+  text-align: center;
+  color: #78716c;
+  font-size: 0.875rem;
+  cursor: pointer;
+  position: relative;
+}
+
+.dropZone:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.dropZone:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.fileInput {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.previewSection {
+  margin-top: 2rem;
+}
+
+.previewHeading {
+  font-family: var(--font-serif);
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+}
+
+.fileList {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.preview {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.5;
+}
+
+.lockedMsg {
+  margin-top: 0.75rem;
+  margin-bottom: 1.5rem;
+  color: #78716c;
+}
