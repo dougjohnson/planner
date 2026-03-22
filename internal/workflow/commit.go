@@ -148,6 +148,14 @@ func CommitFragmentOperations(
 		}
 	}
 
+	// Wrap artifact creation, junction population, and lineage in a transaction
+	// so a crash can't leave partial state.
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("beginning commit transaction: %w", err)
+	}
+	defer tx.Rollback()
+
 	// Create the new artifact.
 	artifactID := uuid.New().String()
 	versionLabel, err := nextVersionLabel(ctx, db, projectID, documentType)
@@ -156,7 +164,7 @@ func CommitFragmentOperations(
 	}
 
 	now := time.Now().UTC().Format(time.RFC3339Nano)
-	_, err = db.ExecContext(ctx,
+	_, err = tx.ExecContext(ctx,
 		`INSERT INTO artifacts (id, project_id, artifact_type, version_label, source_stage, created_at)
 		 VALUES (?, ?, ?, ?, ?, ?)`,
 		artifactID, projectID, documentType, versionLabel, sourceStage, now)
@@ -166,7 +174,7 @@ func CommitFragmentOperations(
 
 	// Populate the junction table.
 	for pos, entry := range newEntries {
-		_, err := db.ExecContext(ctx,
+		_, err := tx.ExecContext(ctx,
 			`INSERT INTO artifact_fragments (artifact_id, fragment_version_id, position)
 			 VALUES (?, ?, ?)`,
 			artifactID, entry.versionID, pos)
@@ -177,12 +185,16 @@ func CommitFragmentOperations(
 
 	// Record lineage: new artifact was derived from the canonical.
 	relationID := uuid.New().String()
-	_, err = db.ExecContext(ctx,
+	_, err = tx.ExecContext(ctx,
 		`INSERT INTO artifact_relations (id, artifact_id, related_artifact_id, relation_type, created_at)
 		 VALUES (?, ?, ?, 'derived_from', ?)`,
 		relationID, artifactID, canonicalArtifactID, now)
 	if err != nil {
 		return nil, fmt.Errorf("recording lineage: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("committing artifact transaction: %w", err)
 	}
 
 	result.ArtifactID = artifactID

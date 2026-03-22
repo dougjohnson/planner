@@ -137,22 +137,36 @@ func ValidateFragmentIDs(ctx context.Context, db *sql.DB, projectID string, resu
 	}
 
 	enriched := make([]models.NormalizedToolCallResult, len(results))
-	copy(enriched, results)
+	for i, r := range results {
+		enriched[i] = r
+		// Deep-copy ValidationErrors to avoid aliasing the caller's slice.
+		if len(r.ValidationErrors) > 0 {
+			enriched[i].ValidationErrors = make([]string, len(r.ValidationErrors))
+			copy(enriched[i].ValidationErrors, r.ValidationErrors)
+		}
+	}
 
 	for i := range enriched {
-		fragID, ok := enriched[i].ToolCall.Arguments["fragment_id"]
-		if !ok {
-			continue
+		args := enriched[i].ToolCall.Arguments
+
+		// Validate fragment_id references.
+		if fragID, ok := args["fragment_id"]; ok {
+			if fragIDStr, ok := fragID.(string); ok && !availableSet[fragIDStr] {
+				enriched[i].Valid = false
+				enriched[i].ValidationErrors = append(enriched[i].ValidationErrors,
+					fmt.Sprintf("fragment_id %q does not exist in the current document; available fragment IDs are: %s",
+						fragIDStr, strings.Join(availableIDs, ", ")))
+			}
 		}
-		fragIDStr, ok := fragID.(string)
-		if !ok {
-			continue
-		}
-		if !availableSet[fragIDStr] {
-			enriched[i].Valid = false
-			enriched[i].ValidationErrors = append(enriched[i].ValidationErrors,
-				fmt.Sprintf("fragment_id %q does not exist in the current document; available fragment IDs are: %s",
-					fragIDStr, strings.Join(availableIDs, ", ")))
+
+		// Also validate after_fragment_id references (used by add_fragment).
+		if afterID, ok := args["after_fragment_id"]; ok {
+			if afterIDStr, ok := afterID.(string); ok && !availableSet[afterIDStr] {
+				enriched[i].Valid = false
+				enriched[i].ValidationErrors = append(enriched[i].ValidationErrors,
+					fmt.Sprintf("after_fragment_id %q does not exist in the current document",
+						afterIDStr))
+			}
 		}
 	}
 

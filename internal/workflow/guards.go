@@ -51,6 +51,40 @@ func RegisteredGuards() []string {
 	return names
 }
 
+// --- Pipeline scope helpers ---
+// These determine which part of the pipeline (PRD vs plan) the project is
+// currently in, so guards can query the right stage/document type.
+
+// planStages are stages in the plan pipeline (10-17).
+var planStages = map[string]bool{
+	"parallel_plan_generation": true, "plan_synthesis": true,
+	"plan_integration": true, "plan_disagreement_review": true,
+	"plan_review": true, "plan_commit": true,
+	"plan_loop_control": true, "final_export": true,
+}
+
+func isInPlanPipeline(currentStage string) bool {
+	return planStages[currentStage]
+}
+
+func currentParallelStage(ctx context.Context, db *sql.DB, projectID string) string {
+	var stage string
+	db.QueryRowContext(ctx, `SELECT current_stage FROM projects WHERE id = ?`, projectID).Scan(&stage)
+	if isInPlanPipeline(stage) {
+		return "parallel_plan_generation"
+	}
+	return "parallel_prd_generation"
+}
+
+func currentReviewStage(ctx context.Context, db *sql.DB, projectID string) string {
+	var stage string
+	db.QueryRowContext(ctx, `SELECT current_stage FROM projects WHERE id = ?`, projectID).Scan(&stage)
+	if isInPlanPipeline(stage) {
+		return "plan_review"
+	}
+	return "prd_review"
+}
+
 // --- Guard Implementations ---
 
 func guardFoundationsApproved(ctx context.Context, db *sql.DB, projectID string) GuardResult {
@@ -85,8 +119,9 @@ func guardSeedPrdSubmitted(ctx context.Context, db *sql.DB, projectID string) Gu
 }
 
 func guardParallelQuorumSatisfied(ctx context.Context, db *sql.DB, projectID string) GuardResult {
-	// Check that at least one GPT-family and one Opus-family run completed successfully
-	// for the current parallel stage.
+	// Determine which parallel stage to check based on project's current stage.
+	parallelStage := currentParallelStage(ctx, db, projectID)
+
 	var gptCount, opusCount int
 	err := db.QueryRowContext(ctx, `
 		SELECT
@@ -95,8 +130,8 @@ func guardParallelQuorumSatisfied(ctx context.Context, db *sql.DB, projectID str
 		FROM workflow_runs wr
 		JOIN model_configs mc ON mc.id = wr.model_config_id
 		WHERE wr.project_id = ? AND wr.status = 'completed'
-		AND wr.stage IN ('parallel_prd_generation', 'parallel_plan_generation')
-	`, projectID).Scan(&gptCount, &opusCount)
+		AND wr.stage = ?
+	`, projectID, parallelStage).Scan(&gptCount, &opusCount)
 	if err != nil {
 		return GuardResult{Passed: false, Reason: fmt.Sprintf("query error: %v", err)}
 	}
@@ -167,12 +202,14 @@ func guardAllDecisionsMade(ctx context.Context, db *sql.DB, projectID string) Gu
 func guardFragmentOperationsRecorded(ctx context.Context, db *sql.DB, projectID string) GuardResult {
 	// Check that the latest review run produced at least one tool call
 	// (either fragment operations or a review summary indicating no changes).
+	reviewStage := currentReviewStage(ctx, db, projectID)
+
 	var count int
 	err := db.QueryRowContext(ctx, `
 		SELECT COUNT(*) FROM workflow_runs
 		WHERE project_id = ? AND status = 'completed'
-		AND stage IN ('prd_review', 'plan_review')
-	`, projectID).Scan(&count)
+		AND stage = ?
+	`, projectID, reviewStage).Scan(&count)
 	if err != nil || count == 0 {
 		return GuardResult{Passed: false, Reason: "no completed review run"}
 	}
@@ -193,6 +230,9 @@ func guardLoopNotExhausted(ctx context.Context, db *sql.DB, projectID string) Gu
 }
 
 func guardLoopExhausted(ctx context.Context, db *sql.DB, projectID string) GuardResult {
+	// Determine which review stage to count based on current position in pipeline.
+	reviewStage := currentReviewStage(ctx, db, projectID)
+
 	// Count completed review iterations and compare to configured max.
 	var maxIter int
 	err := db.QueryRowContext(ctx, `
@@ -207,8 +247,8 @@ func guardLoopExhausted(ctx context.Context, db *sql.DB, projectID string) Guard
 	err = db.QueryRowContext(ctx, `
 		SELECT COUNT(*) FROM workflow_runs
 		WHERE project_id = ? AND status = 'completed'
-		AND stage IN ('prd_review', 'plan_review')
-	`, projectID).Scan(&completedIter)
+		AND stage = ?
+	`, projectID, reviewStage).Scan(&completedIter)
 	if err != nil {
 		return GuardResult{Passed: false, Reason: fmt.Sprintf("query error: %v", err)}
 	}

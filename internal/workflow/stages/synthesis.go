@@ -100,11 +100,13 @@ func ExecuteSynthesis(
 		if err == nil && prevSession != "" {
 			sessionID = prevSession
 			continuityMode = "continued"
+		} else {
+			// Provider supports continuity but no prior session found —
+			// we'll replay context in the prompt instead.
+			continuityMode = "replayed"
 		}
 	}
-	if continuityMode == "fresh" {
-		continuityMode = "replayed"
-	}
+	// If provider doesn't support continuity at all, stays "fresh".
 	runRepo.SetSessionHandle(ctx, run.ID, sessionID, continuityMode)
 
 	// Build the request with synthesis tools.
