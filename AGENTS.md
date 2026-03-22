@@ -951,6 +951,61 @@ Treat cass as a way to avoid re-solving problems other agents already handled.
 
 ---
 
+## Smoke-Testing Before Declaring Work Complete — VERY IMPORTANT
+
+**Every feature that touches a user-visible flow MUST be manually verified in the running application before closing the bead.** Unit tests and compilation checks are necessary but NOT sufficient.
+
+Before closing any bead that affects:
+- **API endpoints:** `curl` the endpoint and verify the response shape, status code, and data
+- **UI pages:** open the page in a browser (or run the relevant Playwright test) and verify it renders correctly
+- **Workflow transitions:** walk through the flow as a user would
+- **Data persistence:** create data, reload the page, verify it's still there
+
+**"Tests pass" is not the same as "it works."** If you cannot run the app (e.g., no browser access), say so explicitly rather than closing the bead.
+
+### Running the Application for Smoke Testing
+
+You are not the only agent. To run the application with your changes, you will need to choose a port that is not currently in use. If you have access to Agent Mail, announce your chosen port and check for conflicts before starting the app.
+
+```bash
+# Build and run on a non-default port to avoid conflicts
+go build -o flywheel-planner ./cmd/flywheel-planner
+FLYWHEEL_LISTEN_ADDR=127.0.0.1:7433 FLYWHEEL_MOCK_PROVIDERS=true ./flywheel-planner &
+
+# Verify it started
+curl -s http://127.0.0.1:7433/api/health | jq .
+
+# Run Playwright tests against your instance
+cd tests/e2e && BASE_URL=http://127.0.0.1:7433 npx playwright test
+
+# ALWAYS shut down when done
+kill %1
+```
+
+Once you have built and launched the app, run your tests against that instance. If you find issues, fix them, rebuild, and repeat until you have a stable instance that works as expected.
+
+**Do NOT leave servers running.** Make sure you shut down your instance after testing, and definitely before moving onto another bead, to free up resources and avoid conflicts with other agents.
+
+### When You Cannot Test
+
+Do not leave other agents in the dark about your testing status. If you cannot test, or if testing is inconclusive, **do not close the bead.** Instead:
+
+1. Identify what other beads need to be completed to enable testing and add them as dependencies
+2. Add a comment to the bead detailing the progress you have made
+3. Document your findings and next steps
+4. Leave the bead open for another agent to take over once the dependencies have been closed
+
+### Anti-Patterns
+
+- Closing 30+ beads in a session without ever launching the application
+- Claiming a feature "works" based solely on unit test results
+- Treating `go build ./...` as proof of correctness
+- Declaring a backlog complete when you haven't used the product as a user
+- Leaving a test server running after you've finished testing
+- Closing a bead with "could not test" without documenting why or what's needed
+
+---
+
 ## Landing the Plane (Session Completion)
 
 **When ending a work session**, you MUST complete ALL steps below.
