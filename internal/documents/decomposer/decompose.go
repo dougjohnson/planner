@@ -4,6 +4,7 @@ package decomposer
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/dougflynn/flywheel-planner/internal/documents/fragments"
@@ -85,8 +86,11 @@ func (d *Decomposer) Decompose(ctx context.Context, projectID, documentType stri
 				// Content identical — reuse existing version.
 				ver = existing
 				result.ReusedVersions++
+			} else if !errors.Is(findErr, fragments.ErrNotFound) {
+				// Unexpected database error — don't silently create a duplicate.
+				return nil, fmt.Errorf("checking version checksum for fragment %s: %w", frag.ID, findErr)
 			} else {
-				// Content changed — create new version.
+				// Content changed (ErrNotFound) — create new version.
 				ver, err = d.store.CreateVersion(ctx, frag.ID, mr.Section.Content, sourceStage, sourceRunID, "content updated")
 				if err != nil {
 					return nil, fmt.Errorf("creating version for fragment %s: %w", frag.ID, err)
@@ -95,12 +99,7 @@ func (d *Decomposer) Decompose(ctx context.Context, projectID, documentType stri
 			}
 		} else {
 			// New section — create fragment + initial version.
-			depth := mr.Section.Depth
-			if depth == 0 {
-				depth = 0 // preamble
-			}
-
-			frag, err = d.store.CreateFragment(ctx, projectID, documentType, mr.Section.Heading, depth)
+			frag, err = d.store.CreateFragment(ctx, projectID, documentType, mr.Section.Heading, mr.Section.Depth)
 			if err != nil {
 				return nil, fmt.Errorf("creating fragment for heading %q: %w", mr.Section.Heading, err)
 			}

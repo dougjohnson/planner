@@ -134,19 +134,20 @@ type fileCredentials struct {
 func (s *Service) getFromFile(provider models.ProviderName) (string, error) {
 	path := filepath.Join(s.dataDir, credentialsFileName)
 
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return "", err
-	}
-
-	// Validate file permissions.
+	// Validate file permissions BEFORE reading content (security: don't load
+	// secrets from world-readable files).
 	info, err := os.Stat(path)
 	if err != nil {
-		return "", fmt.Errorf("stat credentials file: %w", err)
+		return "", err
 	}
 	perm := info.Mode().Perm()
 	if perm&0077 != 0 {
 		return "", fmt.Errorf("credentials file %s has unsafe permissions %o (must be %o)", path, perm, credentialsFilePerm)
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "", err
 	}
 
 	var creds fileCredentials

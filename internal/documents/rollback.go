@@ -3,6 +3,7 @@ package documents
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -103,15 +104,20 @@ func Rollback(ctx context.Context, db *sql.DB, streamID, sourceArtifactID string
 	}, nil
 }
 
-// RollbackEvent records a rollback in the workflow events table.
+// RecordRollbackEvent records a rollback in the workflow events table.
 func RecordRollbackEvent(ctx context.Context, db *sql.DB, projectID, newArtifactID, sourceArtifactID string) error {
 	now := time.Now().UTC().Format(time.RFC3339)
-	_, err := db.ExecContext(ctx,
+	payload, err := json.Marshal(map[string]string{
+		"new_artifact_id":    newArtifactID,
+		"source_artifact_id": sourceArtifactID,
+	})
+	if err != nil {
+		return fmt.Errorf("marshaling rollback event payload: %w", err)
+	}
+	_, err = db.ExecContext(ctx,
 		`INSERT INTO workflow_events (id, project_id, event_type, payload_json, created_at)
 		 VALUES (?, ?, 'artifact:rollback', ?, ?)`,
-		uuid.NewString(), projectID,
-		fmt.Sprintf(`{"new_artifact_id":"%s","source_artifact_id":"%s"}`, newArtifactID, sourceArtifactID),
-		now,
+		uuid.NewString(), projectID, string(payload), now,
 	)
 	return err
 }

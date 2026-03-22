@@ -3,6 +3,7 @@ package models
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"log/slog"
 	"time"
@@ -56,7 +57,7 @@ func (v *CredentialValidator) Validate(ctx context.Context, provider Provider) *
 	} else {
 		// Classify the error.
 		var provErr *ProviderError
-		if ok := isProviderError(err, &provErr); ok && !provErr.Retryable {
+		if errors.As(err, &provErr) && !provErr.Retryable {
 			result.Status = ValidationInvalid
 			result.Message = "invalid credentials: " + provErr.Message
 		} else {
@@ -100,25 +101,6 @@ func (v *CredentialValidator) updateModelConfigStatus(ctx context.Context, provi
 			"error", err,
 		)
 	}
-}
-
-// isProviderError checks if err wraps a ProviderError.
-func isProviderError(err error, target **ProviderError) bool {
-	if err == nil {
-		return false
-	}
-	type unwrapper interface {
-		Unwrap() error
-	}
-	// Simple type assertion — errors.As would be better but we avoid import cycle risk.
-	if pe, ok := err.(*ProviderError); ok {
-		*target = pe
-		return true
-	}
-	if u, ok := err.(unwrapper); ok {
-		return isProviderError(u.Unwrap(), target)
-	}
-	return false
 }
 
 // GetValidationStatus returns the current validation status for a provider from the DB.

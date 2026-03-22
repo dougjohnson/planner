@@ -6,6 +6,8 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -44,11 +46,23 @@ func (h *ExportHandler) getExport(w http.ResponseWriter, r *http.Request) {
 func (h *ExportHandler) downloadExport(w http.ResponseWriter, r *http.Request) {
 	exportID := chi.URLParam(r, "exportId")
 
-	// Look up the bundle path from the exports table.
-	// For now, construct the expected path.
-	bundlePath := fmt.Sprintf("%s/exports/%s.zip", h.dataDir, exportID)
+	// Sanitize exportID to prevent path traversal (§15.2).
+	sanitized := filepath.Base(exportID)
+	if sanitized == "." || sanitized == "/" || strings.Contains(sanitized, "..") {
+		http.Error(w, `{"error":{"code":"bad_request","message":"invalid export ID"}}`, http.StatusBadRequest)
+		return
+	}
 
-	file, err := os.Open(bundlePath)
+	bundlePath := filepath.Join(h.dataDir, "exports", sanitized+".zip")
+
+	// Verify the resolved path stays within the data directory.
+	absPath, err := filepath.Abs(bundlePath)
+	if err != nil || !strings.HasPrefix(absPath, h.dataDir) {
+		http.Error(w, `{"error":{"code":"bad_request","message":"invalid export path"}}`, http.StatusBadRequest)
+		return
+	}
+
+	file, err := os.Open(absPath)
 	if err != nil {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusNotFound)
@@ -63,6 +77,6 @@ func (h *ExportHandler) downloadExport(w http.ResponseWriter, r *http.Request) {
 	defer file.Close()
 
 	w.Header().Set("Content-Type", "application/zip")
-	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s.zip"`, exportID))
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s.zip"`, sanitized))
 	io.Copy(w, file)
 }

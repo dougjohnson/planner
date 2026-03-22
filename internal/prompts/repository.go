@@ -9,6 +9,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -287,11 +288,15 @@ func (r *Repository) scanMany(ctx context.Context, query string, args ...any) ([
 
 // isUniqueViolation checks if the error is a UNIQUE constraint violation.
 func isUniqueViolation(err error) bool {
-	return err != nil && (errors.Is(err, sql.ErrNoRows) ||
-		containsStr(err.Error(), "UNIQUE constraint failed") ||
-		containsStr(err.Error(), "constraint failed"))
+	if err == nil {
+		return false
+	}
+	msg := err.Error()
+	return strings.Contains(msg, "UNIQUE constraint failed") ||
+		strings.Contains(msg, "constraint failed")
 }
 
+// containsStr is kept for backwards compatibility with any callers.
 func containsStr(s, substr string) bool {
 	for i := 0; i <= len(s)-len(substr); i++ {
 		if s[i:i+len(substr)] == substr {
