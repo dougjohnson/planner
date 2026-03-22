@@ -69,8 +69,8 @@ func TestCreate_Success(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected data envelope, got %v", envelope)
 	}
-	if project["Name"] != "My Project" {
-		t.Errorf("expected name 'My Project', got %v", project["Name"])
+	if project["name"] != "My Project" {
+		t.Errorf("expected name 'My Project', got %v", project["name"])
 	}
 }
 
@@ -149,7 +149,7 @@ func TestGetByID(t *testing.T) {
 	var createEnv map[string]any
 	json.NewDecoder(createW.Body).Decode(&createEnv)
 	created := createEnv["data"].(map[string]any)
-	id := created["ID"].(string)
+	id := created["id"].(string)
 
 	// Get by ID.
 	req := httptest.NewRequest("GET", "/api/projects/"+id, nil)
@@ -185,7 +185,7 @@ func TestArchiveAndResume(t *testing.T) {
 	var createEnv2 map[string]any
 	json.NewDecoder(createW.Body).Decode(&createEnv2)
 	created2 := createEnv2["data"].(map[string]any)
-	id := created2["ID"].(string)
+	id := created2["id"].(string)
 
 	// Archive.
 	archReq := httptest.NewRequest("POST", "/api/projects/"+id+"/archive", nil)

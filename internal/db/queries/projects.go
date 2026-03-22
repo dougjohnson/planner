@@ -13,15 +13,33 @@ import (
 
 // Project represents a project row in the database.
 type Project struct {
-	ID                        string
-	Name                      string
-	Description               string
-	Status                    string
-	WorkflowDefinitionVersion string
-	CurrentStage              string
-	CreatedAt                 string
-	UpdatedAt                 string
-	ArchivedAt                sql.NullString
+	ID                        string  `json:"id"`
+	Name                      string  `json:"name"`
+	Description               string  `json:"description"`
+	Status                    string  `json:"status"`
+	WorkflowDefinitionVersion string  `json:"workflow_state"`
+	CurrentStage              string  `json:"current_stage"`
+	CreatedAt                 string  `json:"created_at"`
+	UpdatedAt                 string  `json:"updated_at"`
+	ArchivedAt                *string `json:"archived_at,omitempty"`
+}
+
+// scanArchivedAt is a helper that scans a sql.NullString into *string.
+type nullableString struct {
+	ptr **string
+}
+
+func (n nullableString) Scan(src any) error {
+	ns := sql.NullString{}
+	if err := ns.Scan(src); err != nil {
+		return err
+	}
+	if ns.Valid {
+		*n.ptr = &ns.String
+	} else {
+		*n.ptr = nil
+	}
+	return nil
 }
 
 // ProjectFilter configures list queries.
@@ -66,7 +84,7 @@ func (r *ProjectRepo) GetByID(ctx context.Context, id string) (*Project, error) 
 	`, id).Scan(
 		&p.ID, &p.Name, &p.Description, &p.Status,
 		&p.WorkflowDefinitionVersion, &p.CurrentStage,
-		&p.CreatedAt, &p.UpdatedAt, &p.ArchivedAt,
+		&p.CreatedAt, &p.UpdatedAt, nullableString{&p.ArchivedAt},
 	)
 	if err != nil {
 		return nil, fmt.Errorf("getting project %s: %w", id, err)

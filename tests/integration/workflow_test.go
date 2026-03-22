@@ -78,7 +78,7 @@ func TestIntegration_CreateProject_GetWorkflowStatus(t *testing.T) {
 	var createResp map[string]any
 	json.NewDecoder(resp.Body).Decode(&createResp)
 	data := createResp["data"].(map[string]any)
-	projectID := data["ID"].(string)
+	projectID := data["id"].(string)
 
 	// Get workflow status.
 	resp2, err := http.Get(ts.URL + "/api/projects/" + projectID + "/workflow")

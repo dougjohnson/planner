@@ -62,7 +62,7 @@ func TestProjectRepo_Create(t *testing.T) {
 	if project.Status != "active" {
 		t.Errorf("expected status 'active', got %q", project.Status)
 	}
-	if project.ArchivedAt.Valid {
+	if project.ArchivedAt != nil {
 		t.Error("expected nil archived_at for new project")
 	}
 }
@@ -197,7 +197,7 @@ func TestProjectRepo_Archive_And_Resume(t *testing.T) {
 		t.Fatalf("Archive: %v", err)
 	}
 	archived, _ := repo.GetByID(ctx, p.ID)
-	if !archived.ArchivedAt.Valid {
+	if archived.ArchivedAt == nil {
 		t.Error("expected archived_at to be set")
 	}
 
@@ -211,7 +211,7 @@ func TestProjectRepo_Archive_And_Resume(t *testing.T) {
 		t.Fatalf("Resume: %v", err)
 	}
 	resumed, _ := repo.GetByID(ctx, p.ID)
-	if resumed.ArchivedAt.Valid {
+	if resumed.ArchivedAt != nil {
 		t.Error("expected archived_at to be cleared after resume")
 	}
 
