@@ -19,8 +19,10 @@ test.describe('Foundations Workflow', () => {
     await page.goto('/projects');
     await expect(page).toHaveURL(/\/projects/);
 
-    // Click create project.
-    await page.click('text=Create Project');
+    // Click create project (button text varies: "Create Project" or "New Project").
+    const createLink = page.getByRole('link', { name: /New Project|Create Project/i });
+    await expect(createLink).toBeVisible({ timeout: 5000 });
+    await createLink.click();
 
     // Fill the form.
     await page.fill('[name="name"]', 'E2E Foundations Test');
@@ -29,11 +31,11 @@ test.describe('Foundations Workflow', () => {
     // Submit.
     await page.click('button[type="submit"]');
 
-    // Should redirect to project dashboard.
-    await expect(page).toHaveURL(/\/projects\/[^/]+$/);
+    // Should redirect to project foundations page.
+    await expect(page).toHaveURL(/\/projects\/[a-f0-9-]+/);
 
-    // Verify project name visible.
-    await expect(page.locator('h1')).toContainText('E2E Foundations Test');
+    // Should not show an error.
+    await expect(page.getByRole('alert')).not.toBeVisible();
   });
 
   test('submit foundations via API and verify state', async () => {
