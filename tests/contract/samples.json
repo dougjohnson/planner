@@ -1,0 +1,38 @@
+{
+  "artifact": {
+    "artifact_type": "prd",
+    "created_at": "2026-01-01T00:00:00Z",
+    "id": "art-001",
+    "is_canonical": false,
+    "project_id": "proj-001",
+    "source_model": "gpt-4o",
+    "source_stage": "stage-3",
+    "version_label": "prd.v01"
+  },
+  "project": {
+    "created_at": "2026-01-01T00:00:00Z",
+    "description": "A test project",
+    "id": "proj-001",
+    "name": "Test Project",
+    "status": "active",
+    "updated_at": "2026-01-01T00:00:00Z"
+  },
+  "workflow_status": {
+    "current_stage": "stage-3",
+    "project_id": "proj-001",
+    "stages": [
+      {
+        "stage": "stage-1",
+        "status": "completed"
+      },
+      {
+        "stage": "stage-2",
+        "status": "completed"
+      },
+      {
+        "stage": "stage-3",
+        "status": "running"
+      }
+    ]
+  }
+}

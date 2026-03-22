@@ -40,31 +40,36 @@ func main() {
 func run(ctx context.Context, cfg *app.Config, logger *slog.Logger) error {
 	logger.Info("flywheel-planner starting", "data_dir", cfg.DataDir, "listen_addr", cfg.ListenAddr)
 
-	// Ensure data directory and subdirectories exist.
+	// Step 1: Ensure data directory and subdirectories exist.
 	if err := cfg.EnsureDataDir(); err != nil {
 		return fmt.Errorf("data directory setup: %w", err)
 	}
 	logger.Info("data directory ready", "path", cfg.DataDir)
 
-	// Open SQLite database with hardened pragmas.
+	// Step 3: Open SQLite database with hardened pragmas.
 	database, err := db.Open(ctx, cfg.DBPath, logger)
 	if err != nil {
 		return err
 	}
 	defer database.Close()
 
-	// TODO: Run migrations, initialize services.
+	// TODO: Bootstrap all services (migrations, repos, handlers) once
+	// app.Bootstrap is implemented. For now, the server starts with
+	// health endpoint only.
 	_ = database // will be passed to services once they exist
 
-	// Start HTTP server.
+	// Build HTTP server and mount routes.
 	srv := api.NewServer(cfg.ListenAddr, logger)
+
+	// Embed frontend SPA assets.
+	srv.RegisterSPA(frontendDistFS())
 
 	errCh := make(chan error, 1)
 	go func() {
 		errCh <- srv.ListenAndServe()
 	}()
 
-	// Wait for shutdown signal or server error.
+	// Step 16: Wait for shutdown signal or server error.
 	select {
 	case err := <-errCh:
 		return err

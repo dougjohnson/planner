@@ -65,10 +65,14 @@ func TestCreateFragment_EmptyInputs(t *testing.T) {
 		t.Fatal("expected error for empty project_id")
 	}
 
+	// Empty heading is allowed for preamble fragments.
 	projectID := seedProject(t, tdb)
-	_, err = store.CreateFragment(context.Background(), projectID, "prd", "", 2)
-	if err == nil {
-		t.Fatal("expected error for empty heading")
+	preamble, err := store.CreateFragment(context.Background(), projectID, "prd", "", 0)
+	if err != nil {
+		t.Fatalf("empty heading (preamble) should be allowed: %v", err)
+	}
+	if preamble.Heading != "" {
+		t.Errorf("expected empty heading, got %q", preamble.Heading)
 	}
 }
 
