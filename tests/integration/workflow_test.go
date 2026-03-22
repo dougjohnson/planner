@@ -49,7 +49,7 @@ func setupIntegration(t *testing.T) (*httptest.Server, *sql.DB) {
 	// Build server.
 	srv := api.NewServer("", logger)
 	srv.MountProjectRoutes(handlers.NewProjectHandler(projectRepo, logger))
-	srv.MountWorkflowRoutes(handlers.NewWorkflowHandler(eventPub, logger))
+	srv.MountWorkflowRoutes(handlers.NewWorkflowHandler(db, eventPub, logger))
 	srv.MountSSE(hub)
 
 	ts := httptest.NewServer(srv.Router())

@@ -23,7 +23,7 @@ func setupWorkflowHandler(t *testing.T) (*WorkflowHandler, *chi.Mux) {
 	db.ExecContext(context.Background(),
 		"INSERT INTO projects (id, name, created_at, updated_at) VALUES ('p-1', 'Test', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')")
 
-	handler := NewWorkflowHandler(pub, logger)
+	handler := NewWorkflowHandler(db, pub, logger)
 
 	r := chi.NewRouter()
 	r.Route("/api/projects/{projectId}/workflow", handler.Routes)

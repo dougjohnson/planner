@@ -73,7 +73,7 @@ func Bootstrap(ctx context.Context, cfg *Config, db *sql.DB, logger *slog.Logger
 
 	// Step 14: Build API handlers.
 	projectHandler := handlers.NewProjectHandler(projectRepo, logger)
-	workflowHandler := handlers.NewWorkflowHandler(eventPublisher, logger)
+	workflowHandler := handlers.NewWorkflowHandler(db, eventPublisher, logger)
 
 	logger.Info("application bootstrap complete")
 
