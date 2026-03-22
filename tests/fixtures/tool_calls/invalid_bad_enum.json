@@ -1,0 +1,11 @@
+{
+  "id": "call_test_005",
+  "name": "report_disagreement",
+  "arguments": {
+    "fragment_id": "frag_001",
+    "severity": "critical",
+    "summary": "Issue",
+    "rationale": "Reason",
+    "suggested_change": "Fix"
+  }
+}

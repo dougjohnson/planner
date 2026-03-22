@@ -1,0 +1,24 @@
+{
+  "content": [
+    {"type": "text", "text": "I will submit the updated document."},
+    {
+      "type": "tool_use",
+      "id": "toolu_xyz789",
+      "name": "update_fragment",
+      "input": {
+        "fragment_id": "frag_042",
+        "new_content": "Revised architecture section with improved error handling coverage.",
+        "rationale": "Added error handling patterns per review feedback."
+      }
+    },
+    {
+      "type": "tool_use",
+      "id": "toolu_xyz790",
+      "name": "submit_review_summary",
+      "input": {
+        "summary": "Document is solid with minor improvements applied to error handling.",
+        "key_findings": ["Error handling coverage improved", "Architecture section strengthened"]
+      }
+    }
+  ]
+}

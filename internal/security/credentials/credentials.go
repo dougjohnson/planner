@@ -164,6 +164,87 @@ func (s *Service) getFromFile(provider models.ProviderName) (string, error) {
 	}
 }
 
+// Set writes an API key for the given provider to the credentials config file.
+// The file is created with 0600 permissions if it doesn't exist.
+// Existing keys for other providers are preserved.
+func (s *Service) Set(provider models.ProviderName, key string) error {
+	if s.dataDir == "" {
+		return fmt.Errorf("no data directory configured for credential storage")
+	}
+	if err := ValidateKeyFormat(provider, key); err != nil {
+		return err
+	}
+
+	path := filepath.Join(s.dataDir, credentialsFileName)
+
+	// Read existing credentials if file exists.
+	var creds fileCredentials
+	if data, err := os.ReadFile(path); err == nil {
+		_ = json.Unmarshal(data, &creds) // ignore parse errors, overwrite
+	}
+
+	// Update the key for this provider.
+	switch provider {
+	case models.ProviderOpenAI:
+		creds.OpenAI = key
+	case models.ProviderAnthropic:
+		creds.Anthropic = key
+	default:
+		return fmt.Errorf("unsupported provider %q for credential storage", provider)
+	}
+
+	// Marshal and write atomically.
+	data, err := json.MarshalIndent(creds, "", "  ")
+	if err != nil {
+		return fmt.Errorf("marshaling credentials: %w", err)
+	}
+	data = append(data, '\n')
+
+	// Write to temp file then rename for atomicity.
+	tmpPath := path + ".tmp"
+	if err := os.WriteFile(tmpPath, data, credentialsFilePerm); err != nil {
+		return fmt.Errorf("writing credentials temp file: %w", err)
+	}
+	if err := os.Rename(tmpPath, path); err != nil {
+		os.Remove(tmpPath)
+		return fmt.Errorf("renaming credentials file: %w", err)
+	}
+
+	return nil
+}
+
+// Delete removes the API key for the given provider from the credentials config file.
+func (s *Service) Delete(provider models.ProviderName) error {
+	return s.Set(provider, "")
+}
+
+// ValidateKeyFormat performs basic sanity checks on an API key format.
+// This is not cryptographic validation — just catches obviously wrong inputs.
+func ValidateKeyFormat(provider models.ProviderName, key string) error {
+	key = strings.TrimSpace(key)
+	if key == "" {
+		return nil // empty key means delete
+	}
+	if len(key) < 10 {
+		return fmt.Errorf("API key for %s is too short (minimum 10 characters)", provider)
+	}
+	if strings.ContainsAny(key, " \t\n\r") {
+		return fmt.Errorf("API key for %s contains whitespace", provider)
+	}
+
+	switch provider {
+	case models.ProviderOpenAI:
+		if !strings.HasPrefix(key, "sk-") {
+			return fmt.Errorf("OpenAI API key should start with 'sk-'")
+		}
+	case models.ProviderAnthropic:
+		if !strings.HasPrefix(key, "sk-ant-") {
+			return fmt.Errorf("Anthropic API key should start with 'sk-ant-'")
+		}
+	}
+	return nil
+}
+
 // ClearCache clears any cached environment variable lookups. Useful for testing
 // when env vars change mid-process.
 func (s *Service) ClearCache() {

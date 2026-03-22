@@ -1,0 +1,18 @@
+{
+  "choices": [{
+    "message": {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "call_abc123",
+          "type": "function",
+          "function": {
+            "name": "submit_document",
+            "arguments": "{\"content\": \"## Overview\\n\\nExpanded PRD content.\\n\\n## Requirements\\n\\n- Feature A\\n- Feature B\", \"change_summary\": \"Initial PRD expansion\"}"
+          }
+        }
+      ]
+    }
+  }]
+}

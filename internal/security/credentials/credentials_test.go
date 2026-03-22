@@ -258,6 +258,121 @@ func writeCredentialsFile(t *testing.T, dir string, creds fileCredentials) {
 	}
 }
 
+// --- Tests for Set/Write functionality ---
+
+func TestSet_WritesCredentials(t *testing.T) {
+	dir := t.TempDir()
+	svc := NewService(dir)
+
+	err := svc.Set(models.ProviderOpenAI, "sk-test1234567890")
+	if err != nil {
+		t.Fatalf("Set: %v", err)
+	}
+
+	// Verify file exists with correct permissions.
+	path := filepath.Join(dir, credentialsFileName)
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatalf("credentials file not created: %v", err)
+	}
+	if info.Mode().Perm() != credentialsFilePerm {
+		t.Errorf("permissions = %o, want %o", info.Mode().Perm(), credentialsFilePerm)
+	}
+
+	// Verify we can read the key back.
+	got, err := svc.Get(models.ProviderOpenAI)
+	if err != nil {
+		t.Fatalf("Get after Set: %v", err)
+	}
+	if got != "sk-test1234567890" {
+		t.Errorf("got %q, want %q", got, "sk-test1234567890")
+	}
+}
+
+func TestSet_PreservesOtherProviders(t *testing.T) {
+	dir := t.TempDir()
+	svc := NewService(dir)
+
+	svc.Set(models.ProviderOpenAI, "sk-openai-key12345")
+	svc.Set(models.ProviderAnthropic, "sk-ant-anthropic-key12345")
+
+	openai, _ := svc.Get(models.ProviderOpenAI)
+	anthropic, _ := svc.Get(models.ProviderAnthropic)
+
+	if openai != "sk-openai-key12345" {
+		t.Errorf("OpenAI key = %q", openai)
+	}
+	if anthropic != "sk-ant-anthropic-key12345" {
+		t.Errorf("Anthropic key = %q", anthropic)
+	}
+}
+
+func TestSet_OverwritesExistingKey(t *testing.T) {
+	dir := t.TempDir()
+	svc := NewService(dir)
+
+	svc.Set(models.ProviderOpenAI, "sk-old-key-12345678")
+	svc.Set(models.ProviderOpenAI, "sk-new-key-12345678")
+
+	got, _ := svc.Get(models.ProviderOpenAI)
+	if got != "sk-new-key-12345678" {
+		t.Errorf("got %q, want new key", got)
+	}
+}
+
+func TestValidateKeyFormat_OpenAI(t *testing.T) {
+	if err := ValidateKeyFormat(models.ProviderOpenAI, "sk-validkey12345"); err != nil {
+		t.Errorf("valid OpenAI key rejected: %v", err)
+	}
+	if err := ValidateKeyFormat(models.ProviderOpenAI, "wrong-prefix-key"); err == nil {
+		t.Error("expected error for wrong OpenAI prefix")
+	}
+}
+
+func TestValidateKeyFormat_Anthropic(t *testing.T) {
+	if err := ValidateKeyFormat(models.ProviderAnthropic, "sk-ant-validkey12345"); err != nil {
+		t.Errorf("valid Anthropic key rejected: %v", err)
+	}
+	if err := ValidateKeyFormat(models.ProviderAnthropic, "sk-wrong-prefix-key"); err == nil {
+		t.Error("expected error for wrong Anthropic prefix")
+	}
+}
+
+func TestValidateKeyFormat_TooShort(t *testing.T) {
+	if err := ValidateKeyFormat(models.ProviderOpenAI, "sk-short"); err == nil {
+		t.Error("expected error for too-short key")
+	}
+}
+
+func TestValidateKeyFormat_Whitespace(t *testing.T) {
+	if err := ValidateKeyFormat(models.ProviderOpenAI, "sk-has spaces in it"); err == nil {
+		t.Error("expected error for key with whitespace")
+	}
+}
+
+func TestSet_NoDataDir(t *testing.T) {
+	svc := NewService("")
+	err := svc.Set(models.ProviderOpenAI, "sk-test1234567890")
+	if err == nil {
+		t.Error("expected error when dataDir is empty")
+	}
+}
+
+func TestSet_FileIsValidJSON(t *testing.T) {
+	dir := t.TempDir()
+	svc := NewService(dir)
+	svc.Set(models.ProviderOpenAI, "sk-test1234567890")
+
+	data, err := os.ReadFile(filepath.Join(dir, credentialsFileName))
+	if err != nil {
+		t.Fatalf("reading file: %v", err)
+	}
+	var parsed map[string]any
+	if err := json.Unmarshal(data, &parsed); err != nil {
+		t.Errorf("credentials file is not valid JSON: %v", err)
+	}
+}
+
 func containsString(s, substr string) bool {
 	return len(s) >= len(substr) && (s == substr || len(s) > 0 && containsSubstring(s, substr))
 }

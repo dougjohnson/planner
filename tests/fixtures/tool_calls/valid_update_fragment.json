@@ -1,0 +1,9 @@
+{
+  "id": "call_test_002",
+  "name": "update_fragment",
+  "arguments": {
+    "fragment_id": "frag_001",
+    "new_content": "Updated architecture section with database schema details and API endpoint catalog.",
+    "rationale": "Original section lacked specific implementation details."
+  }
+}

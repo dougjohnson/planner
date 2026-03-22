@@ -1,0 +1,8 @@
+{
+  "id": "call_test_001",
+  "name": "submit_document",
+  "arguments": {
+    "content": "## Introduction\n\nThis is the expanded PRD.\n\n## Architecture\n\nModular monolith pattern.\n\n## Requirements\n\n- Feature A\n- Feature B\n",
+    "change_summary": "Expanded seed PRD with architecture and requirements sections"
+  }
+}

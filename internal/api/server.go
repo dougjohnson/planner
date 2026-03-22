@@ -10,7 +10,9 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/dougflynn/flywheel-planner/internal/api/handlers"
 	"github.com/dougflynn/flywheel-planner/internal/api/middleware"
+	"github.com/dougflynn/flywheel-planner/internal/api/sse"
 	"github.com/go-chi/chi/v5"
 	chimw "github.com/go-chi/chi/v5/middleware"
 )
@@ -110,4 +112,22 @@ func (s *Server) Shutdown(ctx context.Context) error {
 // Router returns the underlying chi.Mux for testing or extension.
 func (s *Server) Router() *chi.Mux {
 	return s.router
+}
+
+// MountProjectRoutes registers project CRUD routes under /api/projects.
+func (s *Server) MountProjectRoutes(h *handlers.ProjectHandler) {
+	s.router.Route("/api/projects", h.Routes)
+}
+
+// MountWorkflowRoutes registers workflow routes under /api/projects/{projectId}/workflow.
+func (s *Server) MountWorkflowRoutes(h *handlers.WorkflowHandler) {
+	s.router.Route("/api/projects/{projectId}/workflow", h.Routes)
+}
+
+// MountSSE registers the SSE endpoint for real-time events.
+func (s *Server) MountSSE(hub *sse.Hub) {
+	s.router.Get("/api/projects/{projectId}/events", func(w http.ResponseWriter, r *http.Request) {
+		projectID := chi.URLParam(r, "projectId")
+		hub.ServeHTTP(w, r, projectID)
+	})
 }

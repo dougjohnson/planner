@@ -1,0 +1,7 @@
+{
+  "id": "call_test_004",
+  "name": "submit_document",
+  "arguments": {
+    "change_summary": "Missing the required content field"
+  }
+}

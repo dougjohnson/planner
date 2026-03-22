@@ -1,0 +1,11 @@
+{
+  "id": "call_test_003",
+  "name": "report_disagreement",
+  "arguments": {
+    "fragment_id": "frag_003",
+    "severity": "major",
+    "summary": "Missing error handling strategy",
+    "rationale": "The architecture section does not address failure modes, retry logic, or graceful degradation. This is critical for a production system.",
+    "suggested_change": "Add a dedicated error handling subsection covering: retry policies per provider, circuit breaker patterns, user-facing error messages, and structured error logging."
+  }
+}
