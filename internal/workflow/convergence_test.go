@@ -66,7 +66,7 @@ func TestDeclineConvergence_WithGuidance(t *testing.T) {
 		RemainingLoops:  2,
 	}
 
-	err := DeclineConvergence(ctx, tdb.DB, "p-1", cr, "Focus on the testing section, it needs more detail")
+	err := DeclineConvergence(ctx, tdb.DB, "p-1", "prd_review", cr, "Focus on the testing section, it needs more detail")
 	require.NoError(t, err)
 
 	// Verify event recorded.
@@ -89,7 +89,7 @@ func TestDeclineConvergence_WithoutGuidance(t *testing.T) {
 		VALUES ('p-1', 'Test', '', 'active', datetime('now'), datetime('now'))`)
 
 	cr := ConvergenceResult{IterationNumber: 2, RemainingLoops: 2}
-	err := DeclineConvergence(ctx, tdb.DB, "p-1", cr, "")
+	err := DeclineConvergence(ctx, tdb.DB, "p-1", "prd_review", cr, "")
 	require.NoError(t, err)
 
 	// No guidance should be injected.
@@ -107,7 +107,7 @@ func TestGetConvergenceHistory(t *testing.T) {
 
 	// Record some events.
 	AcceptConvergence(ctx, tdb.DB, "p-1", ConvergenceResult{IterationNumber: 3})
-	DeclineConvergence(ctx, tdb.DB, "p-1", ConvergenceResult{IterationNumber: 2}, "")
+	DeclineConvergence(ctx, tdb.DB, "p-1", "prd_review", ConvergenceResult{IterationNumber: 2}, "")
 
 	history, err := GetConvergenceHistory(ctx, tdb.DB, "p-1")
 	require.NoError(t, err)

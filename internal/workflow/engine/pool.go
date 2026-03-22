@@ -177,13 +177,21 @@ func (p *Pool) execute(ctx context.Context, req RunRequest) *RunResponse {
 			"provider", req.Provider,
 			"error", err,
 		)
-	} else {
+	} else if resp != nil {
 		p.logger.Debug("worker pool: run completed",
 			"project_id", req.ProjectID,
 			"run_id", req.WorkflowRunID,
 			"provider", req.Provider,
 			"tokens", resp.Usage.TotalTokens,
 		)
+	} else {
+		// Provider returned (nil, nil) — contract violation. Log but don't panic.
+		p.logger.Warn("worker pool: provider returned nil response without error",
+			"project_id", req.ProjectID,
+			"run_id", req.WorkflowRunID,
+			"provider", req.Provider,
+		)
+		result.Error = fmt.Errorf("provider %s returned nil response", req.Provider)
 	}
 
 	return result

@@ -3,6 +3,7 @@ package workflow
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -65,14 +66,17 @@ func AcceptConvergence(ctx context.Context, db *sql.DB, projectID string, result
 	eventID := uuid.New().String()
 	now := time.Now().UTC().Format(time.RFC3339Nano)
 
-	payload := fmt.Sprintf(
-		`{"iteration":%d,"remaining":%d,"accepted_at":"%s"}`,
-		result.IterationNumber, result.RemainingLoops, now)
+	payloadMap := map[string]any{
+		"iteration":   result.IterationNumber,
+		"remaining":   result.RemainingLoops,
+		"accepted_at": now,
+	}
+	payloadJSON, _ := json.Marshal(payloadMap)
 
 	_, err := db.ExecContext(ctx,
 		`INSERT INTO workflow_events (id, project_id, event_type, payload_json, created_at)
 		 VALUES (?, ?, 'convergence_accepted', ?, ?)`,
-		eventID, projectID, payload, now)
+		eventID, projectID, string(payloadJSON), now)
 	if err != nil {
 		return fmt.Errorf("recording convergence acceptance: %w", err)
 	}
@@ -82,29 +86,36 @@ func AcceptConvergence(ctx context.Context, db *sql.DB, projectID string, result
 
 // DeclineConvergence records that the user chose to continue the loop
 // despite convergence detection, optionally with additional guidance.
-func DeclineConvergence(ctx context.Context, db *sql.DB, projectID string, result ConvergenceResult, guidance string) error {
+// The stage parameter must be the current review stage (e.g., "prd_review"
+// or "plan_review") so guidance is injected into the correct pipeline.
+func DeclineConvergence(ctx context.Context, db *sql.DB, projectID, stage string, result ConvergenceResult, guidance string) error {
 	eventID := uuid.New().String()
 	now := time.Now().UTC().Format(time.RFC3339Nano)
 
-	payload := fmt.Sprintf(
-		`{"iteration":%d,"remaining":%d,"declined_at":"%s","has_guidance":%t}`,
-		result.IterationNumber, result.RemainingLoops, now, guidance != "")
+	payloadMap := map[string]any{
+		"iteration":    result.IterationNumber,
+		"remaining":    result.RemainingLoops,
+		"declined_at":  now,
+		"has_guidance": guidance != "",
+		"stage":        stage,
+	}
+	payloadJSON, _ := json.Marshal(payloadMap)
 
 	_, err := db.ExecContext(ctx,
 		`INSERT INTO workflow_events (id, project_id, event_type, payload_json, created_at)
 		 VALUES (?, ?, 'convergence_declined', ?, ?)`,
-		eventID, projectID, payload, now)
+		eventID, projectID, string(payloadJSON), now)
 	if err != nil {
 		return fmt.Errorf("recording convergence decline: %w", err)
 	}
 
-	// If guidance provided, store it for the next iteration.
+	// If guidance provided, store it for the correct review stage.
 	if guidance != "" {
 		guidanceID := uuid.New().String()
 		_, err = db.ExecContext(ctx,
 			`INSERT INTO guidance_injections (id, project_id, stage, guidance_mode, content, created_at)
-			 VALUES (?, ?, 'prd_review', 'advisory_only', ?, ?)`,
-			guidanceID, projectID, guidance, now)
+			 VALUES (?, ?, ?, 'advisory_only', ?, ?)`,
+			guidanceID, projectID, stage, guidance, now)
 		if err != nil {
 			return fmt.Errorf("storing guidance for next iteration: %w", err)
 		}

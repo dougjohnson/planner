@@ -37,6 +37,16 @@ func BuildChangeHistory(ctx context.Context, db *sql.DB, projectID, documentType
 	}
 
 	// Query completed review runs to build iteration history.
+	// IMPORTANT: We collect all rows into a slice BEFORE doing nested queries.
+	// SQLite's single-writer model deadlocks if we try to open a second query
+	// while the first result set is still open on a connection-limited pool.
+	type runRecord struct {
+		runID    string
+		stage    string
+		attempt  int
+		provider string
+	}
+
 	rows, err := db.QueryContext(ctx, `
 		SELECT wr.id, wr.stage, wr.attempt,
 			COALESCE(mc.provider, '') as provider
@@ -48,24 +58,32 @@ func BuildChangeHistory(ctx context.Context, db *sql.DB, projectID, documentType
 	if err != nil {
 		return nil, fmt.Errorf("querying review history: %w", err)
 	}
-	defer rows.Close()
+
+	var runs []runRecord
+	for rows.Next() {
+		var rec runRecord
+		if err := rows.Scan(&rec.runID, &rec.stage, &rec.attempt, &rec.provider); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		runs = append(runs, rec)
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return nil, err
+	}
+	rows.Close() // Explicitly close before nested queries.
 
 	history := &ChangeHistory{
 		DocumentType: documentType,
 	}
 
 	iterNum := 0
-	for rows.Next() {
-		var runID, stage, provider string
-		var attempt int
-		if err := rows.Scan(&runID, &stage, &attempt, &provider); err != nil {
-			return nil, err
-		}
-
-		if stage == reviewStage {
+	for _, rec := range runs {
+		if rec.stage == reviewStage {
 			iterNum++
 			family := "gpt"
-			if provider == "anthropic" {
+			if rec.provider == "anthropic" {
 				family = "opus"
 			}
 			entry := ChangeHistoryEntry{
@@ -74,7 +92,7 @@ func BuildChangeHistory(ctx context.Context, db *sql.DB, projectID, documentType
 			}
 
 			// Load fragment operations from this run's events.
-			ops := loadRunFragmentOps(ctx, db, runID)
+			ops := loadRunFragmentOps(ctx, db, rec.runID)
 			for _, op := range ops {
 				switch op {
 				case "update":
@@ -94,7 +112,7 @@ func BuildChangeHistory(ctx context.Context, db *sql.DB, projectID, documentType
 	}
 	history.TotalIters = iterNum
 
-	return history, rows.Err()
+	return history, nil
 }
 
 // RenderChangeHistoryMarkdown produces the concise markdown summary injected

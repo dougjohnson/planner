@@ -89,13 +89,17 @@ func (c *Config) EnsureDataDir() error {
 		return fmt.Errorf("creating data directory %s: %w", c.DataDir, err)
 	}
 
-	// Verify the resolved path matches what we expect (symlink safety, §15.2).
-	resolved, err := filepath.EvalSymlinks(c.DataDir)
+	// Verify the data directory itself is not a symlink (§15.2).
+	// We check with Lstat to detect if the final path component is a symlink.
+	// Parent path components may be symlinks (e.g., /tmp → /private/tmp on macOS)
+	// — that's the OS's business, not ours. We only care that OUR directory
+	// isn't a symlink pointing somewhere unexpected.
+	info, err := os.Lstat(c.DataDir)
 	if err != nil {
-		return fmt.Errorf("evaluating symlinks for %s: %w", c.DataDir, err)
+		return fmt.Errorf("checking data directory: %w", err)
 	}
-	if resolved != c.DataDir {
-		return fmt.Errorf("data directory %s resolves to %s via symlink — refusing to use a symlinked data root", c.DataDir, resolved)
+	if info.Mode()&os.ModeSymlink != 0 {
+		return fmt.Errorf("data directory %s is a symlink — refusing to use a symlinked data root", c.DataDir)
 	}
 
 	// Create required subdirectories.

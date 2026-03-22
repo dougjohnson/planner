@@ -61,7 +61,10 @@ func EvaluateRecovery(
 		}
 	}
 
-	allAttempts := append(priorAttempts, results)
+	// Copy to avoid mutating the caller's slice if it has spare capacity.
+	allAttempts := make([][]models.NormalizedToolCallResult, len(priorAttempts)+1)
+	copy(allAttempts, priorAttempts)
+	allAttempts[len(priorAttempts)] = results
 
 	// All valid → proceed.
 	if len(invalid) == 0 {

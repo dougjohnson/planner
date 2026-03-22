@@ -156,9 +156,10 @@ func CommitFragmentOperations(
 	}
 	defer tx.Rollback()
 
-	// Create the new artifact.
+	// Create the new artifact. Compute version label INSIDE the transaction
+	// to avoid SQLite connection deadlock (nested query while tx holds conn).
 	artifactID := uuid.New().String()
-	versionLabel, err := nextVersionLabel(ctx, db, projectID, documentType)
+	versionLabel, err := nextVersionLabelTx(ctx, tx, projectID, documentType)
 	if err != nil {
 		return nil, fmt.Errorf("computing version label: %w", err)
 	}
@@ -183,11 +184,11 @@ func CommitFragmentOperations(
 		}
 	}
 
-	// Record lineage: new artifact was derived from the canonical.
+	// Record lineage: new artifact was revised from the canonical (Stage 8/15 commit).
 	relationID := uuid.New().String()
 	_, err = tx.ExecContext(ctx,
 		`INSERT INTO artifact_relations (id, artifact_id, related_artifact_id, relation_type, created_at)
-		 VALUES (?, ?, ?, 'derived_from', ?)`,
+		 VALUES (?, ?, ?, 'revised_from', ?)`,
 		relationID, artifactID, canonicalArtifactID, now)
 	if err != nil {
 		return nil, fmt.Errorf("recording lineage: %w", err)
@@ -233,9 +234,9 @@ func loadArtifactFragments(ctx context.Context, db *sql.DB, artifactID string) (
 	return frags, rows.Err()
 }
 
-func nextVersionLabel(ctx context.Context, db *sql.DB, projectID, documentType string) (string, error) {
+func nextVersionLabelTx(ctx context.Context, tx *sql.Tx, projectID, documentType string) (string, error) {
 	var count int
-	err := db.QueryRowContext(ctx,
+	err := tx.QueryRowContext(ctx,
 		`SELECT COUNT(*) FROM artifacts WHERE project_id = ? AND artifact_type = ?`,
 		projectID, documentType).Scan(&count)
 	if err != nil {

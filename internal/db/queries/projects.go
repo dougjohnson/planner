@@ -97,7 +97,7 @@ func (r *ProjectRepo) List(ctx context.Context, filter ProjectFilter) ([]*Projec
 	}
 	defer rows.Close()
 
-	var projects []*Project
+	projects := make([]*Project, 0)
 	for rows.Next() {
 		p := &Project{}
 		if err := rows.Scan(

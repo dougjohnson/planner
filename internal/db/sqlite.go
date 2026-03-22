@@ -31,6 +31,13 @@ func Open(ctx context.Context, dsn string, logger *slog.Logger) (*sql.DB, error)
 		return nil, fmt.Errorf("opening sqlite: %w", err)
 	}
 
+	// SQLite per-connection pragmas (foreign_keys, busy_timeout, synchronous)
+	// only apply to the connection they're executed on. With connection pooling,
+	// new connections would not have these pragmas set. Setting MaxOpenConns(1)
+	// ensures all operations use the same connection with pragmas applied.
+	// WAL mode (journal_mode) is database-level and persists across connections.
+	db.SetMaxOpenConns(1)
+
 	if err := applyPragmas(ctx, db, logger); err != nil {
 		db.Close()
 		return nil, err
