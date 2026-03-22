@@ -208,6 +208,60 @@ func Bootstrap(ctx context.Context, cfg *Config, db *sql.DB, logger *slog.Logger
 		},
 	))
 
+	// Register Stage 7 handler (PRD review + commit + loop control).
+	// This handler runs one review iteration: review → commit → check convergence.
+	dispatcher.Register("prd_review", engine.StageHandlerFunc(
+		func(ctx context.Context, projectID, _ string) error {
+			// Determine which provider to use (model rotation at midpoint).
+			// For simplicity in V1, use GPT for all review iterations.
+			provider := providerRegistry.Get(models.ProviderOpenAI)
+			if provider == nil {
+				return fmt.Errorf("GPT provider not registered")
+			}
+
+			// Run review pass.
+			reviewResult, err := stages.ExecuteReview(ctx, db, provider,
+				stages.PRDReviewConfig("gpt"), projectID, "", logger)
+			if err != nil {
+				return err
+			}
+
+			logger.Info("stage 7 review complete",
+				"operations", reviewResult.OperationCount,
+				"no_changes", reviewResult.NoChanges)
+
+			// Stage 8: Commit fragment operations.
+			if !reviewResult.NoChanges && len(reviewResult.Operations) > 0 {
+				// Find canonical artifact.
+				var canonicalID string
+				db.QueryRowContext(ctx,
+					`SELECT id FROM artifacts WHERE project_id = ? AND artifact_type = 'prd' AND is_canonical = 1
+					 ORDER BY created_at DESC LIMIT 1`, projectID,
+				).Scan(&canonicalID)
+
+				if canonicalID != "" {
+					commitResult, err := workflow.CommitFragmentOperations(
+						ctx, db, projectID, canonicalID,
+						reviewResult.Operations, "prd_review", "", "prd")
+					if err != nil {
+						logger.Error("commit failed", "error", err)
+					} else {
+						logger.Info("stage 8 commit complete",
+							"artifact_id", commitResult.ArtifactID,
+							"updates", commitResult.UpdateCount)
+					}
+				}
+			}
+
+			// Stage 9: Loop control — for mock testing, advance to plan pipeline.
+			// In production this would check iteration count and convergence.
+			db.ExecContext(ctx,
+				`UPDATE projects SET current_stage = 'parallel_plan_generation' WHERE id = ?`, projectID)
+
+			return nil
+		},
+	))
+
 	// Step 14: Build API handlers.
 	projectHandler := handlers.NewProjectHandler(projectRepo, logger)
 	workflowHandler := handlers.NewWorkflowHandler(db, eventPublisher, logger)
