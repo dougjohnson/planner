@@ -1,0 +1,30 @@
+[
+  {
+    "id": "frag-001",
+    "heading": "Overview",
+    "ordinal": 0,
+    "content": "This document describes a minimal task manager that allows users to create,\nupdate, and delete tasks. It serves as a test fixture for the fragment system.",
+    "version": 1
+  },
+  {
+    "id": "frag-002",
+    "heading": "User Stories",
+    "ordinal": 1,
+    "content": "- As a user, I can create a new task with a title and description\n- As a user, I can mark a task as complete\n- As a user, I can delete a task\n- As a user, I can view all my tasks",
+    "version": 1
+  },
+  {
+    "id": "frag-003",
+    "heading": "Technical Requirements",
+    "ordinal": 2,
+    "content": "The application should use a local SQLite database for persistence.\nAll API endpoints should return JSON responses with proper error handling.",
+    "version": 1
+  },
+  {
+    "id": "frag-004",
+    "heading": "Non-Functional Requirements",
+    "ordinal": 3,
+    "content": "- Response time under 200ms for all operations\n- Support for concurrent access\n- Data integrity enforced via foreign keys",
+    "version": 1
+  }
+]

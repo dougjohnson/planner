@@ -1,0 +1,13 @@
+# UBS ignore patterns for planner
+# Add patterns to exclude from bug scanning
+
+# Common exclusions
+node_modules/
+.git/
+*.min.js
+*.bundle.js
+dist/
+build/
+coverage/
+.venv/
+__pycache__/

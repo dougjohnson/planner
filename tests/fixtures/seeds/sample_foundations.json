@@ -1,0 +1,15 @@
+{
+  "project_name": "Test Task Manager",
+  "tech_stack": {
+    "backend": "Go 1.25",
+    "frontend": "React 19 + TypeScript",
+    "database": "SQLite (WAL mode)",
+    "build_tool": "Vite"
+  },
+  "architecture_direction": "Monolith with clean internal package boundaries",
+  "constraints": [
+    "Local-first, no cloud dependencies",
+    "Single-user desktop application",
+    "All data stored in ~/.test-app/"
+  ]
+}
