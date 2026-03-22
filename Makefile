@@ -18,15 +18,26 @@ LDFLAGS := -ldflags "-s -w -X main.version=$(VERSION)"
 # Default: full production build.
 all: build
 
-# Full production build: frontend → embed → Go binary.
-build: frontend backend
+# Embed location: Go's embed directive can't use ".." paths, so we copy
+# the built frontend into cmd/flywheel-planner/dist/ before compiling.
+EMBED_DIR := cmd/flywheel-planner/dist
+
+# Full production build: frontend → copy to embed dir → Go binary.
+build: frontend embed-copy backend
 	@echo "Build complete: $(BUILD_DIR)/$(BINARY_NAME)"
 
 # Build the React frontend.
 frontend:
 	@echo "Building frontend..."
-	cd $(FRONTEND_DIR) && npm run build
+	cd $(FRONTEND_DIR) && npm ci --ignore-scripts && npm run build
 	@echo "Frontend built to $(FRONTEND_DIST)"
+
+# Copy frontend build output to the Go embed directory.
+embed-copy:
+	@echo "Copying frontend assets to embed directory..."
+	@rm -rf $(EMBED_DIR)
+	@cp -r $(FRONTEND_DIST) $(EMBED_DIR)
+	@echo "Copied $$(find $(EMBED_DIR) -type f | wc -l | tr -d ' ') files to $(EMBED_DIR)"
 
 # Build the Go binary with embedded frontend assets.
 backend:
@@ -105,6 +116,7 @@ fmt-check:
 clean:
 	rm -rf $(BUILD_DIR)
 	rm -rf $(FRONTEND_DIST)
+	rm -rf $(EMBED_DIR)
 	rm -rf $(REPORT_DIR)
 
 # --- Development ---

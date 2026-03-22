@@ -76,6 +76,17 @@ If any boot step fails, the application exits with a clear error message.
 
 ## Troubleshooting
 
+### `make build` fails with embed error
+- If you see `pattern all:dist: no matching files`, the embed directory is missing.
+- Run `make frontend embed-copy` to populate it, or create the placeholder:
+  ```bash
+  mkdir -p cmd/flywheel-planner/dist
+  echo '<html><body>dev</body></html>' > cmd/flywheel-planner/dist/index.html
+  ```
+
+### `go test -race` fails on macOS
+The race detector requires CGo. Install Xcode Command Line Tools: `xcode-select --install`
+
 ### Application won't start
 - Check log output for specific boot step failure
 - Verify data directory permissions: `ls -la ~/.flywheel-planner`
@@ -120,10 +131,61 @@ cp -r ~/backup/projects/ ~/.flywheel-planner/projects/
 
 ## Build from Source
 
+### Prerequisites
+
+| Tool | Minimum Version | Check |
+|------|----------------|-------|
+| Go | 1.25.0 | `go version` |
+| Node.js | 18.x | `node --version` |
+| npm | 10.x | `npm --version` |
+
+**macOS:**
+- Install via Homebrew: `brew install go node`
+- `xcode-select --install` is required only for `go test -race` (CGo dependency). The SQLite driver (`modernc.org/sqlite`) is pure Go and does not need CGo.
+
+**Linux (Ubuntu/Debian):** See https://go.dev/dl/ for Go, https://nodejs.org/ for Node.
+
+### Production Build
+
 ```bash
-# Prerequisites: Go 1.25+, Node.js 20+, npm
-make build          # Full production build
-make test           # Run all tests
-make lint           # Run linters
-make check          # Type checking (Go + TypeScript)
+make build          # Frontend → embed-copy → Go binary
+# Output: build/flywheel-planner (single binary, ~14 MB)
+```
+
+**What `make build` does:**
+1. `make frontend` — `npm ci && npm run build` in `frontend/`
+2. `make embed-copy` — copies `frontend/dist/` to `cmd/flywheel-planner/dist/` (Go's `embed` directive cannot use `..` paths)
+3. `make backend` — `go build` embeds the copied assets via `//go:embed all:dist`
+
+### Build Without Make
+
+```bash
+cd frontend && npm ci && npm run build && cd ..
+rm -rf cmd/flywheel-planner/dist
+cp -r frontend/dist cmd/flywheel-planner/dist
+go build -ldflags "-s -w" -o flywheel-planner ./cmd/flywheel-planner
+```
+
+### Development Mode
+
+No production build needed — the Vite dev server proxies `/api` to the Go backend:
+
+```bash
+# Terminal 1: backend (uses placeholder frontend embed)
+go run ./cmd/flywheel-planner
+
+# Terminal 2: frontend dev server with hot reload
+cd frontend && npm run dev
+# Open http://localhost:5173
+```
+
+### Tests and Quality Gates
+
+```bash
+make test           # Backend unit tests + frontend tests
+make test-race      # Backend with race detector (requires CGo)
+make test-coverage  # HTML coverage report in test-reports/
+make lint           # go vet + ESLint
+make check          # TypeScript + Go build verification
+make fmt-check      # Formatting check (CI mode)
 ```
