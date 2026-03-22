@@ -33,6 +33,12 @@ venv/
 # Go compiled binary (root level only, not cmd/flywheel-planner/ directory)
 /flywheel-planner
 
+# Playwright E2E test artifacts and lock file
+tests/e2e/node_modules/
+tests/e2e/package-lock.json
+tests/e2e/test-results/
+tests/e2e/playwright-report/
+
 # Local AI agent settings
 .claude/settings.local.json
 
